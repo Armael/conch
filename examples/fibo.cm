@@ -1,0 +1,65 @@
+(main)
+
+(char-of-num (n) (local)
+  (ret (n + $0))
+)
+
+(print-num (n) (local code)
+  (code <- char-of-num n)
+  (! putchar code)
+  (ret)
+)
+
+(print-int (n) (local last-digit)
+  (ifte (n < 10) ((print-num n)) (
+    (last-digit = (n % 10))
+    (n = (n / 10))
+    (print-int n)
+    (print-num last-digit)
+  ))
+  (ret)
+)
+
+(newline () (local) (! putchar 10) (ret))
+
+(fibo (n) (local x y tmp)
+  (x = 1)
+  (y = 1)
+  (while (0 < n) (
+    (tmp = x)
+    (x = y)
+    (y = (tmp + y))
+    (print-int x)
+    (newline)
+    (n = (n - 1))
+  ))
+  (ret)
+)
+
+(main () (local n)
+  (n = 10000)
+  (while (0 < n) ((fibo 50) (n = (n - 1))))
+  (ret))
+
+; $ ./main.exe fibo.cm > fibo.S && gcc -o fibo fibo.S
+; $ ./fibo
+; 1
+; 2
+; 3
+; 5
+; 8
+; 13
+; 21
+; 34
+; 55
+; 89
+; 144
+; 233
+; 377
+; 610
+; 987
+; 1597
+; 2584
+; 4181
+; 6765
+; 10946

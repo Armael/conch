@@ -1,0 +1,6 @@
+(f)
+
+; there is no tail-call elimination
+(f () (local)
+  (f)
+  (ret))
