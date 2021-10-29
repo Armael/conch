@@ -3,8 +3,8 @@
 (nil () (local) (ret 0))
 
 (cons (x xs) (local cell cdr)
-  (cell <- ! malloc 16)
-  (cdr = (cell + 8))
+  (cell <- ! malloc 4)
+  (cdr = (cell + 2))
   (cell := x)
   (cdr := xs)
   (ret cell))
@@ -12,8 +12,8 @@
 (rev (l) (local prev next)
   (prev <- nil)
   (while l (
-    (next = (* (l + 8)))
-    ((l + 8) := prev)
+    (next = (* (l + 2)))
+    ((l + 2) := prev)
     (prev = l)
     (l = next)
   ))
@@ -22,7 +22,7 @@
 (print-list (xs) (local car cdr)
   (while xs (
     (car = (* xs))
-    (cdr = (* (xs + 8)))
+    (cdr = (* (xs + 2)))
     (! putchar car)
     (xs = cdr)
   ))

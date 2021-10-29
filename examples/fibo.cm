@@ -10,9 +10,13 @@
   (ret)
 )
 
+(mod10 (n) (local x)
+  (x = ((n / 10) * 10))
+  (ret (n - x)))
+
 (print-int (n) (local last-digit)
   (ifte (n < 10) ((print-num n)) (
-    (last-digit = (n % 10))
+    (last-digit <- mod10 n)
     (n = (n / 10))
     (print-int n)
     (print-num last-digit)
@@ -36,9 +40,8 @@
   (ret)
 )
 
-(main () (local n)
-  (n = 10000)
-  (while (0 < n) ((fibo 50) (n = (n - 1))))
+(main () (local)
+  (fibo 20)
   (ret))
 
 ; $ ./main.exe fibo.cm > fibo.S && gcc -o fibo fibo.S

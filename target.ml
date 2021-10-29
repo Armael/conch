@@ -1,5 +1,4 @@
 type opcode =
-  | LIT
   | LDZ
   | LDA
   | STA
@@ -50,6 +49,12 @@ type inst =
 let i (opcode: opcode) (flags: opflag list) =
   I (opcode, opflags_to_flags flags)
 
+let inst_size = function
+  | I _ -> 1
+  | Idat _ -> 2 (* LIT + 1 byte *)
+  | Idat16 _ -> 3 (* LIT + 2 bytes *)
+  | Icomment _ -> 0
+
 (* type inst =
  *   (\* arithmetic *\)
  *   | IConst of reg * int64
@@ -85,7 +90,6 @@ type asm = inst list
 let pp_lab ppf n = Format.fprintf ppf "L%d" n
 
 let pp_opcode ppf = function
-  | LIT -> Format.fprintf ppf "LIT"
   | LDZ -> Format.fprintf ppf "LDZ"
   | LDA -> Format.fprintf ppf "LDA"
   | STA -> Format.fprintf ppf "STA"
@@ -146,14 +150,15 @@ let pp_inst ppf = function
   | I (op, flags) -> Format.fprintf ppf "%a%a" pp_opcode op pp_opcode_flags flags
   | Idat x -> Format.fprintf ppf "#%.2x" (x land 0xFF)
   | Idat16 x -> Format.fprintf ppf "#%.4x" (x land 0xFFFF)
-  | Icomment _s -> (*Format.fprintf ppf "/* %s */" s*) ()
+  | Icomment s -> Format.fprintf ppf "( %s )" s
 
-let pp_insts _off ppf insts =
-  List.iteri (fun _i inst ->
-    Format.fprintf ppf "%a\n" pp_inst inst
-  ) insts
+let pp_insts off ppf insts =
+  List.fold_left (fun off inst ->
+    Format.fprintf ppf "(%x) %a\n" off pp_inst inst;
+    off + inst_size inst
+  ) off insts |> ignore
 
-let pp_asm ppf asm =
+let pp_asm off ppf asm =
 (*   Format.fprintf ppf "
  * \t.bss
  * \t.p2align 3 /* 8-byte align */
@@ -169,12 +174,12 @@ let pp_asm ppf asm =
  * \tmovabs $heapE, %%r15 /* r15 := heap end */
  * %a
  * " *)
+  Format.fprintf ppf "|0100\n";
   Format.fprintf ppf "%a"
-    (pp_insts 0) asm
+    (pp_insts off) asm
 
 let assemble_opcode = function
   | BRK -> 0x00
-  | LIT -> 0x00 (* XXX: LIT with no flags is BRK *)
   | POP -> 0x02
   | NIP -> 0x04
   | SWP -> 0x05
@@ -202,9 +207,6 @@ let assemble_opcode = function
   | SFT -> 0x1f
 
 let assemble_opcode_with_flags opcode flags =
-  let flags =
-    if opcode = LIT then { flags with keep = true } else flags
-  in
   assemble_opcode opcode
   lor (if flags.short then 0x20 else 0)
   lor (if flags.return then 0x40 else 0)
@@ -212,8 +214,8 @@ let assemble_opcode_with_flags opcode flags =
 
 let assemble_inst = function
   | I (opcode, flags) -> [assemble_opcode_with_flags opcode flags]
-  | Idat n -> [n land 0xff]
-  | Idat16 n -> [n lsr 8; n land 0xff] (* XXX todo check *)
+  | Idat n -> [0x80 (* LIT *); n land 0xff]
+  | Idat16 n -> [0x20 (* LIT2 *); (n lsr 8) land 0xff; n land 0xff]
   | Icomment _ -> []
 
 let assemble prog =

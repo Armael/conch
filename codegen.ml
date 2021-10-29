@@ -12,11 +12,7 @@ let appendl (l: 'a applist list): 'a applist =
 
 let instr_list_len l =
   List.fold_left (fun acc instr ->
-    acc +
-    match instr with
-    | I (_, _) | Idat _ -> 1
-    | Idat16 _ -> 2
-    | Icomment _ -> 0
+    acc + inst_size instr
   ) 0 l
 
 let rec alength = function
@@ -30,73 +26,51 @@ let rec aflatten = function
 let fail fmt =
   Printf.ksprintf (fun s -> failwith s) fmt
 
-let sp_addr = 0
-let mem_start_addr = 1
+let prog_start = 0x0100
 
-let init, alloc_offset =
-  let setup (main_loc: int) (mem_start: int) =
+let init, sp_addr, alloc_addr, init_end_offset =
+  let setup (main_loc: int) =
     List [
-      (* initialize sp, mem_start *)
-      (* sp initially points to the end of the first page, i.e. 0xfe given that a
-         stack slots is 2 bytes *)
-      i LIT []; Idat 0xfe; i LIT []; Idat sp_addr; i STZ [];
-      (* mem_start points to the rest of memory after the program *)
-      i LIT [S]; Idat16 mem_start; i LIT []; Idat mem_start_addr; i STZ [S];
       (* jump to the main function *)
-      i LIT [S]; Idat16 main_loc; i JMP [S];
+      Idat16 main_loc; i JSR [S];
       (* end of the program *)
-      i BRK []
+      i BRK [];
+    ] in
+  let localdata (mem_start: int) =
+    List [ (* initial values for sp and heap_start *)
+      (* stack size: 512 bytes *)
+      (* sp initially points to the end of the first page, i.e. mem_start+0x1fe
+         given that a stack slots is 2 bytes *)
+      Idat16 (mem_start + 0x1fe);
+      (* heap_start initially points to the part of memory after the stack *)
+      Idat16 (mem_start + 0x200);
     ]
   in
+  let sp_addr = prog_start + alength (setup 0) in
+  let heap_start_addr = sp_addr + 2 in
   let alloc =
     List [
       (* alloc *)
       Icomment "alloc";
-      i LIT []; Idat 0; (* pad mem_start_addr *) i LIT []; Idat mem_start_addr;
-      i LDZ [S;K]; (* mem_start ; mem_start_addr ; alloc_sz *)
+      Idat16 heap_start_addr;
+      i LDA [S;K]; (* mem_start ; mem_start_addr ; alloc_sz *)
       i ROT [S]; (* alloc_sz ; mem_start ; mem_start_addr *)
       i ADD [S;K]; (* mem_start + alloc_sz ; alloc_sz ; mem_start ; mem_start_addr *)
       i NIP [S]; (* mem_start + alloc_sz ; mem_start ; mem_start_addr *)
       i ROT [S]; (* mem_start_addr ; mem_start + alloc_sz ; mem_start *)
-      i NIP []; (* unpad mem_start_addr *)
-      i STZ [S]; (* mem_start_addr <- mem_start + alloc_sz *)
+      i STA [S]; (* mem_start_addr <- mem_start + alloc_sz *)
       (* mem_start *)
       i JMP [S;R] (* ret *)
     ]
   in
   let init main_loc mem_start =
-    setup main_loc mem_start ++ alloc
+    setup main_loc ++
+    localdata mem_start ++
+    alloc
   in
-  let alloc_offset = alength (setup 0 0) in
-  init, alloc_offset
-
-let prog_start = 0x0100
-let alloc_addr = prog_start + alloc_offset
-
-(*
-let init (main_loc: int) =
-  [
-    (* jump to the main function *)
-    (*  0 *) ICall main_loc;
-    (* end of the program: return to exit 0 *)
-    (*  1 *) IConst (RDI, 0L);
-    (*  2 *) IExit;
-    (* alloc *)
-    (*  3 *) IComment "alloc";
-    (* XXX: somewhat awkward register handling because of the awkward
-       condition/conditional jumps *)
-    (*  4 *) IMov (RDX, R14);
-    (*  5 *) IAdd (R14, RAX);
-    (*  6 *) ILt (R14, R15);
-    (*  7 *) IJump (CIfFalse RAX, 11);
-    (*  8 *) IMov (RAX, RDX);
-    (*  9 *) IRet;
-    (* give up *)
-    (* 10 *) IComment "exit 1";
-    (* 11 *) IConst (RDI, 1L);
-    (* 12 *) IExit;
-  ]
-*)
+  let alloc_addr = prog_start + alength (setup 0 ++ localdata 0) in
+  let init_end_offset = alength (init 0 0) in
+  init, sp_addr, alloc_addr, init_end_offset
 
 type c_stack = ident list
 
@@ -114,9 +88,9 @@ let find_local' (v: ident) (stack: c_stack): int =
 
 let get_stackelt_addr (k: int) =
   List [
-    i LIT []; Idat sp_addr;
-    i LDZ [];  (* read sp *)
-    Idat k; i ADD []; (* sp+k *)
+    Idat16 sp_addr;
+    i LDA [S];  (* read sp *)
+    Idat16 (2*k); i ADD [S]; (* sp+2*k *) (* 1 stack slot = 2 bytes *)
   ]
 
 (* push the value at the top of the vm stack
@@ -124,23 +98,23 @@ let get_stackelt_addr (k: int) =
 *)
 let push_to_c_stack =
   List [
-    i LIT []; Idat sp_addr; i LDZ [K]; i LIT []; Idat 1; i SUB []; (* sp-1 *)
-    i SWP []; i STZ [K]; i POP []; (* write the new sp (sp-1) *)
-    i STZ [S];
+    Idat16 sp_addr; i LDA [S;K]; Idat16 2; i SUB [S]; (* sp-2 *)
+    i SWP [S]; i STA [S;K]; i POP [S]; (* write the new sp (sp-2) *)
+    i STA [S];
   ]
 
-(* decrease SP by k *)
+(* decrease SP by k slots *)
 let sub_sp (k: int) =
   List [
-    i LIT []; Idat sp_addr; i LDZ [K]; i LIT []; Idat k; i SUB []; (* sp-k *)
-    i SWP []; i STZ []
+    Idat16 sp_addr; i LDA [S;K]; Idat16 (2*k); i SUB [S]; (* sp-2*k *) (* 1 slot = 2 bytes *)
+    i SWP [S]; i STA [S]
   ]
 
-(* increment SP by k *)
+(* increment SP by k slots *)
 let add_sp (k: int) =
   List [
-    i LIT []; Idat sp_addr; i LDZ [K]; i LIT []; Idat k; i ADD []; (* sp+k *)
-    i SWP []; i STZ []
+    Idat16 sp_addr; i LDA [S;K]; Idat16 (2*k); i ADD [S]; (* sp+2*k *)
+    i SWP [S]; i STA [S]
   ]
 
 module Expr = struct
@@ -157,29 +131,28 @@ module Expr = struct
   let var (v: ident) (stack: c_stack) =
     let k = find_local' v stack in
     get_stackelt_addr k ++
-    List [i LDZ [S]] (* read sp+k as a 16 bits int *)
+    List [i LDA [S]] (* read sp+k *)
 
   let addr (v: ident) (stack: c_stack) =
     let k = find_local' v stack in
-    List [i LIT []; Idat 0] ++ (* this pads the result to 16 bits *)
     get_stackelt_addr k
 
   let const16 (c: int) =
     assert (c land 0xFFFF = c);
-    List [i LIT [S]; Idat16 c]
+    List [Idat16 c]
 
  (* /!\ arguments are passed in reverse on the stack *)
   let c_add = List [i ADD [S]]
-  let c_sub = List [i SWP [S]]
-  let c_div = List [i SWP [S]]
+  let c_sub = List [i SUB [S]]
+  let c_div = List [i DIV [S]]
   let c_mul = List [i MUL [S]]
   let c_and = List [i AND [S]]
   let c_or = List [i ORA [S]]
   let c_xor = List [i EOR [S]]
-  let c_cmp_lt = List [i LTH [S]; i LIT []; Idat 0; i SWP [] (* pad *)]
-  let c_cmp_gt = List [i GTH [S]; i LIT []; Idat 0; i SWP [] (* pad *)]
-  let c_cmp_eq = List [i EQU [S]; i LIT []; Idat 0; i SWP [] (* pad *)]
-  let c_cmp_neq = List [i NEQ [S]; i LIT []; Idat 0; i SWP [] (* pad *)]
+  let c_cmp_lt = List [i LTH [S]; Idat 0; i SWP [] (* pad *)]
+  let c_cmp_gt = List [i GTH [S]; Idat 0; i SWP [] (* pad *)]
+  let c_cmp_eq = List [i EQU [S]; Idat 0; i SWP [] (* pad *)]
+  let c_cmp_neq = List [i NEQ [S]; Idat 0; i SWP [] (* pad *)]
 
   let c_binop = function
     | Oadd -> c_add
@@ -230,38 +203,41 @@ module Stmt = struct
 
   let assign (v: ident) (e: expr) (stack: c_stack) =
     let k = find_local' v stack in
-    get_stackelt_addr k ++
     Expr.expr stack e ++
-    List [i STA []]
+    get_stackelt_addr k ++
+    List [i STA [S]]
 
   let store (a: expr) (w: expr) (stack: c_stack) =
-    Expr.exprs stack [a; w] ++
-    List [i SWP [S]; i STA [S]]
+    Expr.exprs stack [w; a] ++
+    List [i STA [S]]
 
   let call (lid: ident option) (target: int) (xs: expr list) stack =
     Expr.exprs stack xs ++
     call_pops (List.length xs) ++
-    List [i LIT [S]; Idat16 target; i JSR [S]] ++
+    List [Idat16 target; i JSR [S]] ++
     (match lid with
      | None -> List []
-     | Some v -> Expr.var v stack)
+     | Some v ->
+       let k = find_local' v stack in
+       get_stackelt_addr k ++ List [i STA [S]])
 
   let putchar =
-    List [i LIT []; Idat 18; i DEO [S]]
+    List [Idat 0x18; i DEO [S]]
 
   let malloc =
-    List [i LIT [S]; Idat16 alloc_addr; i JSR [S]]
+    List [Idat16 alloc_addr; i JSR [S]]
 
   let builtin (lid: ident option) (ef: external_function) (xs: expr list) stack =
     Expr.exprs stack xs ++
-    call_pops (List.length xs) ++
     (match ef with
      | EF_putchar -> putchar
      | EF_malloc -> malloc
     ) ++
     (match lid with
      | None -> List []
-     | Some v -> Expr.var v stack)
+     | Some v ->
+       let k = find_local' v stack in
+       get_stackelt_addr k ++ List [i STA [S]])
 
   let rec stmt (loc: int) (funcs: (ident * int) list) stack = function
     | Sskip -> skip
@@ -282,11 +258,11 @@ module Stmt = struct
       ce ++
       List [
         (* condition: 16 bits -> 8 bits *) i ORA [];
-        i LIT [S]; Idat16 c1_loc; i JCN [S]
+        Idat16 c1_loc; i JCN [S]
       ] ++
       c2 ++
-      List [i LIT [S]; Idat16 end_loc; i JMP [S]] ++
-      c2
+      List [Idat16 end_loc; i JMP [S]] ++
+      c1
     | Sloop (e, s) ->
       let ce = Expr.expr stack e in
       let c_loc = loc + alength ce + 9 in
@@ -295,11 +271,11 @@ module Stmt = struct
       ce ++
       List [
         (* cond: 16 bits -> 8 bits *) i ORA [];
-        i LIT [S]; Idat16 c_loc; i JCN [S]
+        Idat16 c_loc; i JCN [S]
       ] ++
-      List [i LIT [S]; Idat16 end_loc; i JMP [S]] ++
+      List [Idat16 end_loc; i JMP [S]] ++
       c ++
-      List [i LIT [S]; Idat16 loc; i JMP [S]]
+      List [Idat16 loc; i JMP [S]]
 end
 
 module Func = struct
@@ -325,8 +301,9 @@ let rec decs (loc: int) (funcs: (ident * int) list) (ds: (ident * func) list) =
 
 let program (p: program) =
   let init_len = alength (init 0 0 (* dummys *)) in
-  let (_, fs) = decs init_len [] p.prog_defs in
-  let (c, _) = decs init_len fs p.prog_defs in
+  let loc0 = prog_start + init_len in
+  let (_, fs) = decs loc0 [] p.prog_defs in
+  let (c, _) = decs loc0 fs p.prog_defs in
   let main_loc = lookup_fname p.prog_main fs in
   let mem_start = prog_start + init_len + alength c in
   aflatten (init main_loc mem_start ++ c)

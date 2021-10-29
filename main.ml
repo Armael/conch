@@ -139,7 +139,7 @@ let () =
   | Ok sexps ->
     let prog = prog_of_sexps sexps in
     let asm = Codegen.program prog in
-    Format.fprintf Format.std_formatter "%a\n" Target.pp_asm asm;
+    Format.fprintf Format.std_formatter "%a\n" (Target.pp_asm Codegen.prog_start) asm;
     let bytes = Target.assemble asm in
     let out = open_out output in
     List.iter (output_byte out) bytes;

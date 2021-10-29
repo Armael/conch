@@ -1,0 +1,11 @@
+(main)
+
+(main () (local)
+  (ifte 0
+    ((! putchar $a))
+    ((! putchar $b)))
+  (ifte 1
+    ((! putchar $a))
+    ((! putchar $b)))
+  (! putchar 10)
+  (ret))
