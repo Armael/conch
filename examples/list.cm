@@ -1,34 +1,36 @@
 (main)
+; linked lists of u8
+; list type = :*void
 
-(nil () (local) (ret 0))
+(:*void nil () (local) (ret (#0 as :*void)))
 
-(cons (x xs) (local cell cdr)
-  (cell <- ! malloc 4)
-  (cdr = (cell + 2))
-  (cell := x)
+(:*void cons (:u8 x :*void xs) (local :*void cell :**void cdr)
+  (cell <- ! malloc 3)
+  (cdr = ((cell + 1) as :**void))
+  ((cell as :*u8) := x)
   (cdr := xs)
-  (ret cell))
+  (ret (cell as :*void)))
 
-(rev (l) (local prev next)
+(:*void rev (:*void l) (local :*void prev :*void next)
   (prev <- nil)
-  (while l (
-    (next = (* (l + 2)))
-    ((l + 2) := prev)
+  (while (l != #0) (
+    (next = (* ((l + 1) as :**void)))
+    (((l + 1) as :**void) := prev)
     (prev = l)
     (l = next)
   ))
   (ret prev))
 
-(print-list (xs) (local car cdr)
-  (while xs (
-    (car = (* xs))
-    (cdr = (* (xs + 2)))
+(:void print-list (:*void xs) (local :u8 car :*void cdr)
+  (while (xs != #0) (
+    (car = (* (xs as :*u8)))
+    (cdr = (* ((xs + 1) as :**void)))
     (! putchar car)
     (xs = cdr)
   ))
   (ret))
 
-(main () (local l)
+(:void main () (local :*void l)
   (l <- nil)
   (l <- cons $H l)
   (l <- cons $e l)

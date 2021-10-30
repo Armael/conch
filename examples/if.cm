@@ -1,6 +1,6 @@
 (main)
 
-(main () (local)
+(:void main () (local)
   (ifte 0
     ((! putchar $a))
     ((! putchar $b)))

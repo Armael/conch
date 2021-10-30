@@ -1,6 +1,6 @@
 (main)
 
-(main () (local i)
+(:void main () (local :u8 i)
   (i = $a)
   (while ((i < $z) or (i = $z)) (
     (! putchar i)

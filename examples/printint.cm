@@ -1,28 +1,29 @@
 (main)
 
-(char-of-num (n) (local)
+(:u8 char-of-num (:u8 n) (local)
   (ret (n + $0))
 )
 
-(print-num (n) (local code)
+(:void print-num (:u8 n) (local :u8 code)
   (code <- char-of-num n)
   (! putchar code)
   (ret)
 )
 
-(mod10 (n) (local)
-  (ret (n - ((n / 10) * 10))))
+(:u8 mod10 (:u16 n) (local :u16 x)
+  (x = ((n / #10) * #10))
+  (ret ((n - x) as :u8)))
 
-(print-int (n) (local last-digit)
-  (ifte (n < 10) ((print-num n)) (
+(:void print-int (:u16 n) (local :u8 last-digit)
+  (ifte (n < #10) ((print-num (n as :u8))) (
     (last-digit <- mod10 n)
-    (n = (n / 10))
+    (n = (n / #10))
     (print-int n)
     (print-num last-digit)
   ))
   (ret)
 )
 
-(main () (local x)
-  (print-int 42)
+(:void main () (local)
+  (print-int #42)
   (ret))
