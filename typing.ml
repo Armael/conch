@@ -47,9 +47,21 @@ let type_of_retid_opt ty_idents id_opt =
 let type_of_builtin ret_ty args_ty = function
   | EF_putchar -> (Tbase Tvoid, [Tbase Tint8])
   | EF_malloc ->
-    match ret_ty, args_ty with
+    begin match ret_ty, args_ty with
     | Tptr _, [Tbase (Tint16|Tint8)] -> (ret_ty, args_ty)
-    | _ -> die "wrong return or argument types for malloc"
+    | _ -> die "malloc: wrong return or argument types"
+    end
+  | EF_out ->
+    begin match args_ty with
+    | [_; Tbase Tint8] -> (Tbase Tvoid, args_ty)
+    | _ -> die "out: wrong number of arguments or argument types"
+    end
+  | EF_in ->
+    if ret_ty = Tbase Tvoid then die "out: wrong return type";
+    begin match args_ty with
+    | [Tbase Tint8] -> (ret_ty, args_ty)
+    | _ -> die "out: wrong number of arguments"
+    end
 
 let find_id id map =
   match IdentMap.find_opt id map with
@@ -132,7 +144,9 @@ let typecheck_call ty_idents fname ret_ty args_ty ret_id_opt tes =
   begin match ret_ty, ret_id_opt with
   | Tbase Tvoid, Some _ ->
     die "call to %s: cannot bind result of function returning void" fname
-  | _, None -> () (* ok to ignore result *)
+  | Tbase Tvoid, None -> ()
+  | _, None ->
+    die "call to %s: ignoring a non-void result" fname
   | _, Some rid ->
     let rid_ty = find_id rid ty_idents in
     if ret_ty <> rid_ty then

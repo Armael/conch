@@ -24,6 +24,7 @@ type opcode =
   | ROT
   | NIP
   | DEO
+  | DEI
 
 type opcode_flags =
   { keep : bool;
@@ -115,6 +116,7 @@ let pp_opcode ppf = function
   | ROT -> Format.fprintf ppf "ROT"
   | NIP -> Format.fprintf ppf "NIP"
   | DEO -> Format.fprintf ppf "DEO"
+  | DEI -> Format.fprintf ppf "DEI"
 
 let pp_opcode_flags ppf (f: opcode_flags) =
   Format.fprintf ppf "%s%s%s"
@@ -195,7 +197,7 @@ let assemble_opcode = function
   | STZ -> 0x11
   | LDA -> 0x14
   | STA -> 0x15
-  (* | DEI -> 0x16 *)
+  | DEI -> 0x16
   | DEO -> 0x17
   | ADD -> 0x18
   | SUB -> 0x19

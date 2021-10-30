@@ -36,6 +36,8 @@ type expr =
 type external_function =
   | EF_putchar
   | EF_malloc
+  | EF_out
+  | EF_in
 
 type 'expr stmt' =
   | Sskip
@@ -103,6 +105,8 @@ let rec pp_expr fmt = function
 let string_of_builtin = function
   | EF_putchar -> "putchar"
   | EF_malloc -> "malloc"
+  | EF_out -> "out"
+  | EF_in -> "in"
 
 (* parsing: from sexps *)
 
@@ -170,6 +174,8 @@ let prog_of_sexps (sexps: CCSexp.t list) =
   let builtin_of_string = function
     | "putchar" -> EF_putchar
     | "malloc" -> EF_malloc
+    | "out" -> EF_out
+    | "in" -> EF_in
     | s -> die "unknown builtin %s" s
   in
 

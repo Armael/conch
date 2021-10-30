@@ -118,17 +118,19 @@ let push_to_c_stack ty =
 
 (* decrease SP by k bytes *)
 let sub_sp (k: int) =
-  List [
-    Idat16 sp_addr; i LDA [S;K]; Idat16 k; i SUB [S]; (* sp-k *)
-    i SWP [S]; i STA [S]
-  ]
+  if k = 0 then List [] else
+    List [
+      Idat16 sp_addr; i LDA [S;K]; Idat16 k; i SUB [S]; (* sp-k *)
+      i SWP [S]; i STA [S]
+    ]
 
 (* increment SP by k bytes *)
 let add_sp (k: int) =
-  List [
-    Idat16 sp_addr; i LDA [S;K]; Idat16 k; i ADD [S]; (* sp+k *)
-    i SWP [S]; i STA [S]
-  ]
+  if k = 0 then List [] else
+    List [
+      Idat16 sp_addr; i LDA [S;K]; Idat16 k; i ADD [S]; (* sp+k *)
+      i SWP [S]; i STA [S]
+    ]
 
 module Expr = struct
   (* invariant:
@@ -272,10 +274,10 @@ module Stmt = struct
        let k = find_local idents_ty v stack in
        get_stackelt_addr k ++ List [i STA (szflag (IdentMap.find v idents_ty))])
 
-  let putchar =
+  let ef_putchar =
     List [Idat 0x18; i DEO []]
 
-  let malloc args_ty =
+  let ef_malloc args_ty =
     begin match args_ty with
     | [Tbase Tint16] -> List []
     | [Tbase Tint8] -> List [Idat 0; i SWP []] (* pad *)
@@ -283,12 +285,23 @@ module Stmt = struct
     end ++
     List [Idat16 alloc_addr; i JSR [S]]
 
+  let ef_out args_ty =
+    match args_ty with
+    | [ty; _] -> List [i DEO (szflag ty)]
+    | _ -> assert false
+
+  let ef_in ret_ty =
+    List [i DEI (szflag ret_ty)]
+
   let builtin idents_ty (lid: ident option) (ef: external_function) (xs: typed_expr list) stack =
+    let ret_ty = type_of_retid_opt idents_ty lid in
     let args_ty = List.map snd xs in
     Expr.exprs idents_ty stack xs ++
     (match ef with
-     | EF_putchar -> putchar
-     | EF_malloc -> malloc args_ty
+     | EF_putchar -> ef_putchar
+     | EF_malloc -> ef_malloc args_ty
+     | EF_out -> ef_out args_ty
+     | EF_in -> ef_in ret_ty
     ) ++
     (match lid with
      | None -> List []
