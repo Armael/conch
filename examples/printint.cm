@@ -1,7 +1,7 @@
 (main)
 
 (:u8 char-of-num (:u8 n) (local)
-  (ret (n + $0))
+  (ret (n + '0))
 )
 
 (:void print-num (:u8 n) (local :u8 code)

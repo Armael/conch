@@ -146,7 +146,7 @@ let prog_of_sexps (sexps: CCSexp.t list) =
         if x > 0xFFFF then
           die "%d: integer litteral larger than 16 bits" x;
         Econst (C16 x)
-      ) else if Char.equal c '$' then
+      ) else if Char.equal c '\'' then
         Econst (C8 (Char.code v.[1]))
       else
         Evar v
