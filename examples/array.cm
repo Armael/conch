@@ -3,14 +3,14 @@
   (i = s)
   (c = (* i))
   (while c (
-    (! putchar c)
+    (!putchar c)
     (i = (i + 1))
     (c = (* i))
   ))
   (ret))
 
 (:void main () (local :*u8 a :*u8 i)
-  (a <- ! malloc #12)
+  (a = ((!malloc #12) as :*u8))
   (i = a)
   (i := 'H) (i = (i + 1))
   (i := 'e) (i = (i + 1))
@@ -19,5 +19,5 @@
   (i := 'o) (i = (i + 1))
   (i := 0)
   (print-string a)
-  (! putchar 10)
+  (!putchar 10)
   (ret))

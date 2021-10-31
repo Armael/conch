@@ -98,7 +98,7 @@ let rec translate_expr glob_offs genv lenv (e: Lang.expr):
     | _ ->
       let id, lenv = gen_fresh_ident genv lenv ty in
       Cminor.sseq s (Scall (Some id, f, es')),
-      Some (Evar id, ty), ls, lenv
+      Some (Evar id, ty), ls @ [(id, ty)], lenv
     end
   | Ebuiltin (ef, es) ->
     let s, es', ls, lenv = translate_exprs es in
@@ -109,7 +109,7 @@ let rec translate_expr glob_offs genv lenv (e: Lang.expr):
     | _ ->
       let id, lenv = gen_fresh_ident genv lenv ty in
       Cminor.sseq s (Sbuiltin (Some id, ef, es')),
-      Some (Evar id, ty), ls, lenv
+      Some (Evar id, ty), ls @ [(id, ty)], lenv
     end
 
 let rec translate_stmt glob_offs genv lenv (s: Lang.stmt):

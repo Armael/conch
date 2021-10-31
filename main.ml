@@ -12,6 +12,10 @@ let () =
   | Ok sexps ->
     let prog = Frontend.prog_of_sexps sexps in
     let cm_prog = Lang2cminor.translate_prog prog in
+    Format.set_margin 30;
+    List.iter (fun sexp ->
+      Format.fprintf Format.std_formatter "%a\n@." CCSexp.pp sexp
+    ) (Cminor.sexps_of_prog cm_prog);
     let asm = Codegen.program cm_prog in
     Format.fprintf Format.std_formatter "%a\n" (Target.pp_asm Codegen.prog_start) asm;
     let bytes = Target.assemble asm in

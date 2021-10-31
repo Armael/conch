@@ -51,37 +51,6 @@ type program = {
 
 (* printing *)
 
-let pp_tybase fmt = function
-  | Tvoid -> Format.fprintf fmt "void"
-  | Tint8 -> Format.fprintf fmt "u8"
-  | Tint16 -> Format.fprintf fmt "u16"
-
-let rec pp_ty fmt = function
-  | Tbase ty -> pp_tybase fmt ty
-  | Tptr ty -> Format.fprintf fmt "*%a" pp_ty ty
-
-let pp_ty fmt ty = pp_ty fmt ty
-
-let string_of_op = function
-  | Oadd -> "+"
-  | Osub -> "-"
-  | Odiv -> "/"
-  | Omul -> "*"
-  | Oand -> "and"
-  | Oor -> "or"
-  | Oxor -> "xor"
-  | Ocmp Lt -> "<"
-  | Ocmp Gt -> ">"
-  | Ocmp Eq -> "="
-  | Ocmp Neq -> "!="
-
-let string_of_builtin = function
-  | EF_putchar -> "putchar"
-  | EF_malloc -> "malloc"
-  | EF_out -> "out"
-  | EF_in8 -> "in8"
-  | EF_in16 -> "in16"
-
 let rec pp_expr fmt e =
   match fst e with
   | Evar v -> Format.fprintf fmt "%s" v

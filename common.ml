@@ -33,3 +33,27 @@ type external_function =
   | EF_out
   | EF_in8
   | EF_in16
+
+let string_of_op = function
+  | Oadd -> "+"
+  | Osub -> "-"
+  | Odiv -> "/"
+  | Omul -> "*"
+  | Oand -> "and"
+  | Oor -> "or"
+  | Oxor -> "xor"
+  | Ocmp Lt -> "<"
+  | Ocmp Gt -> ">"
+  | Ocmp Eq -> "="
+  | Ocmp Neq -> "!="
+
+let string_of_builtin = function
+  | EF_putchar -> "putchar"
+  | EF_malloc -> "malloc"
+  | EF_out -> "out"
+  | EF_in8 -> "in8"
+  | EF_in16 -> "in16"
+
+let string_of_const = function
+  | C8 x -> string_of_int x
+  | C16 x -> "#" ^ string_of_int x

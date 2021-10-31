@@ -42,6 +42,77 @@ type program = {
   prog_main : ident;
 }
 
+(* conversion to sexps *)
+
+let string_of_glob n =
+  "@" ^ string_of_int n
+
+let rec sexp_of_expr (e: expr) =
+  match fst e with
+  | Evar v -> `Atom v
+  | Eglob n -> `Atom (string_of_glob n)
+  | Eaddr v -> `List [`Atom "&"; `Atom v]
+  | Econst c -> `Atom (string_of_const c)
+  | Ebinop (op, e1, e2) ->
+    `List [sexp_of_expr e1;
+           `Atom (string_of_op op);
+           sexp_of_expr e2]
+  | Eload e -> `List [`Atom "*"; sexp_of_expr e]
+  | Ecast (e, ty) ->
+    `List [sexp_of_expr e; `Atom (string_of_ty ty)]
+
+let rec sexps_of_stmt (s: stmt) =
+  match s with
+  | Sskip -> []
+  | Sassign (v, e) ->
+    [`List [`Atom v; `Atom "="; sexp_of_expr e]]
+  | Sassign_glob (v, e) ->
+    [`List [`Atom (string_of_glob v); sexp_of_expr e]]
+  | Sstore (e1, e2) ->
+    [`List [sexp_of_expr e1; `Atom ":="; sexp_of_expr e2]]
+  | Scall (ret, f, es) ->
+    begin match ret with
+    | None -> [`List (`Atom f :: List.map sexp_of_expr es)]
+    | Some ret ->
+      [`List (`Atom ret :: `Atom "<-" :: `Atom f ::
+              List.map sexp_of_expr es)]
+    end
+  | Sbuiltin (ret, ef, es) ->
+    let f = string_of_builtin ef in
+    begin match ret with
+    | None -> [`List (`Atom f :: List.map sexp_of_expr es)]
+    | Some ret ->
+      [`List (`Atom ret :: `Atom "<-" :: `Atom f ::
+              List.map sexp_of_expr es)]
+    end
+  | Sseq (s1, s2) ->
+    sexps_of_stmt s1 @ sexps_of_stmt s2
+  | Sifthenelse (e, s1, s2) ->
+    [`List [`Atom "ifte"; sexp_of_expr e;
+            `List (sexps_of_stmt s1); `List (sexps_of_stmt s2)]]
+  | Sloop (e, s) ->
+    [`List [`Atom "loop"; sexp_of_expr e; `List (sexps_of_stmt s)]]
+
+let sexps_of_typed_idents (l: (ident * ty) list) =
+  List.concat_map (fun (id, ty) ->
+    [`Atom (string_of_ty ty); `Atom id]
+  ) l
+
+let sexp_of_func fname (f: func) =
+  `List (
+    `Atom (string_of_ty f.fn_ret_ty) ::
+    `Atom fname ::
+    `List (sexps_of_typed_idents f.fn_params) ::
+    `List (`Atom "local" :: sexps_of_typed_idents f.fn_vars) ::
+    sexps_of_stmt f.fn_body @
+    (match f.fn_ret with
+     | None -> [`List [`Atom "ret"]]
+     | Some ret -> [`List [`Atom "ret"; sexp_of_expr ret]])
+  )
+
+let sexps_of_prog (p: program) =
+  List.map (fun (fname, f) -> sexp_of_func fname f) p.prog_defs
+
 (* helpers *)
 
 let type_of_expr (e: expr): ty =
