@@ -10,9 +10,9 @@ let () =
   match CCSexp.parse_file_list input with
   | Error err -> die "Cannot parse input file: %s" err
   | Ok sexps ->
-    let prog = Parsetree.prog_of_sexps sexps in
-    let typed_prog = Typing.type_program prog in
-    let asm = Codegen.program typed_prog in
+    let prog = Frontend.prog_of_sexps sexps in
+    let cm_prog = Lang2cminor.translate_prog prog in
+    let asm = Codegen.program cm_prog in
     Format.fprintf Format.std_formatter "%a\n" (Target.pp_asm Codegen.prog_start) asm;
     let bytes = Target.assemble asm in
     let out = open_out output in

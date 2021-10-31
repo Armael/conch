@@ -1,5 +1,6 @@
-open Parsetree
-open Typing
+open Common
+open Types
+open Cminor
 open Target
 
 let die fmt = Common.die ~where:"codegen" fmt
@@ -36,6 +37,7 @@ let ptrtype = function
   | Tptr ty -> ty
   | _ -> assert false
 
+let globs_start = 0x0
 let prog_start = 0x0100
 
 let init, sp_addr, alloc_addr, init_end_offset =
@@ -148,6 +150,10 @@ module Expr = struct
     get_stackelt_addr k ++
     List [i LDA (szflag (IdentMap.find v idents_ty))] (* read sp+k *)
 
+  let glob (off: int) ty =
+    let glob_addr = globs_start + off in
+    List [Idat glob_addr; i LDZ (szflag ty)]
+
   let addr idents_ty (v: ident) (stack: c_stack) =
     let k = find_local idents_ty v stack in
     get_stackelt_addr k
@@ -218,18 +224,19 @@ module Expr = struct
     | Tbase Tint8, Tbase Tint8
     | (Tbase Tint16 | Tptr _), (Tbase Tint16 | Tptr _) -> List []
 
-  let rec expr idents_ty (stack: c_stack) (e: typed_expr) =
+  let rec expr idents_ty (stack: c_stack) (e: expr) =
     match fst e with
     | Evar v -> var idents_ty v stack
+    | Eglob n -> glob n (type_of_expr e)
     | Eaddr v -> addr idents_ty v stack
     | Econst (C8 x) -> const8 x
     | Econst (C16 x) -> const16 x
     | Ebinop (op, e1, e2) ->
       exprs idents_ty stack [e1; e2] ++
-      c_binop (expr_type e1) (expr_type e2) op
-    | Eload e -> expr idents_ty stack e ++ c_load (expr_type e)
+      c_binop (type_of_expr e1) (type_of_expr e2) op
+    | Eload e -> expr idents_ty stack e ++ c_load (type_of_expr e)
     | Ecast (e, to_ty) ->
-      expr idents_ty stack e ++ c_cast (expr_type e) to_ty
+      expr idents_ty stack e ++ c_cast (type_of_expr e) to_ty
 
   and exprs idents_ty (stack: c_stack) = function
     | [] -> List []
@@ -254,19 +261,24 @@ let rec lookup_fname (f: ident) (funcs: (ident * int) list): int =
 module Stmt = struct
   let skip = List []
 
-  let assign idents_ty (v: ident) (e: typed_expr) (stack: c_stack) =
+  let assign idents_ty (v: ident) (e: expr) (stack: c_stack) =
     let k = find_local idents_ty v stack in
     Expr.expr idents_ty stack e ++
     get_stackelt_addr k ++
     List [i STA (szflag (IdentMap.find v idents_ty))]
 
-  let store idents_ty (a: typed_expr) (w: typed_expr) (stack: c_stack) =
-    Expr.exprs idents_ty stack [w; a] ++
-    List [i STA (szflag (expr_type w))]
+  let assign_glob idents_ty (off: int) (e: expr) (stack: c_stack) =
+    let glob_addr = globs_start + off in
+    Expr.expr idents_ty stack e ++
+    List [Idat glob_addr; i STZ (szflag (type_of_expr e))]
 
-  let call idents_ty (lid: ident option) (target: int) (xs: typed_expr list) stack =
+  let store idents_ty (a: expr) (w: expr) (stack: c_stack) =
+    Expr.exprs idents_ty stack [w; a] ++
+    List [i STA (szflag (type_of_expr w))]
+
+  let call idents_ty (lid: ident option) (target: int) (xs: expr list) stack =
     Expr.exprs idents_ty stack xs ++
-    call_pops (List.rev_map expr_type xs) ++
+    call_pops (List.rev_map type_of_expr xs) ++
     List [Idat16 target; i JSR [S]] ++
     (match lid with
      | None -> List []
@@ -290,18 +302,27 @@ module Stmt = struct
     | [ty; _] -> List [i DEO (szflag ty)]
     | _ -> assert false
 
-  let ef_in ret_ty =
-    List [i DEI (szflag ret_ty)]
+  let ef_in8 =
+    List [i DEI []]
 
-  let builtin idents_ty (lid: ident option) (ef: external_function) (xs: typed_expr list) stack =
-    let ret_ty = type_of_retid_opt idents_ty lid in
+  let ef_in16 =
+    List [i DEI [S]]
+
+  (* let type_of_retid_opt ty_idents id_opt =
+   *   (Option.fold
+   *      ~none:(Tbase Tvoid)
+   *      ~some:(fun v -> IdentMap.find v ty_idents)
+   *      id_opt) *)
+
+  let builtin idents_ty (lid: ident option) (ef: external_function) (xs: expr list) stack =
     let args_ty = List.map snd xs in
     Expr.exprs idents_ty stack xs ++
     (match ef with
      | EF_putchar -> ef_putchar
      | EF_malloc -> ef_malloc args_ty
      | EF_out -> ef_out args_ty
-     | EF_in -> ef_in ret_ty
+     | EF_in8 -> ef_in8
+     | EF_in16 -> ef_in16
     ) ++
     (match lid with
      | None -> List []
@@ -312,6 +333,7 @@ module Stmt = struct
   let rec stmt idents_ty (loc: int) (funcs: (ident * int) list) stack = function
     | Sskip -> skip
     | Sassign (v, e) -> assign idents_ty v e stack
+    | Sassign_glob (off, e) -> assign_glob idents_ty off e stack
     | Sstore (a, w) -> store idents_ty a w stack
     | Scall (lid, f, xs) -> call idents_ty lid (lookup_fname f funcs) xs stack
     | Sbuiltin (lid, ef, xs) -> builtin idents_ty lid ef xs stack
@@ -342,20 +364,21 @@ module Stmt = struct
 end
 
 module Func = struct
-  let func (loc: int) (funcs: (ident * int) list) (f: typed_func) =
-    let stack = f.tfn_vars @ f.tfn_params in
+  let func (loc: int) (funcs: (ident * int) list) (f: func) =
+    let vars = List.map fst f.fn_vars in
+    let stack = vars @ (List.map fst f.fn_params) in
     (* reserve stack space for the local variables *)
-    let subsp = sub_sp (stack_size f.tfn_idents_ty f.tfn_vars) in
+    let subsp = sub_sp (stack_size f.fn_lenv vars) in
     subsp ++
-    Stmt.stmt f.tfn_idents_ty (loc + alength subsp) funcs stack f.tfn_body ++
-    (match f.tfn_ret with
+    Stmt.stmt f.fn_lenv (loc + alength subsp) funcs stack f.fn_body ++
+    (match f.fn_ret with
      | None -> List []
-     | Some rete -> Expr.expr f.tfn_idents_ty stack rete) ++
-    add_sp (stack_size f.tfn_idents_ty stack) ++
+     | Some rete -> Expr.expr f.fn_lenv stack rete) ++
+    add_sp (stack_size f.fn_lenv stack) ++
     List [i JMP [S;R] (* ret *)]
 end
 
-let rec decs (loc: int) (funcs: (ident * int) list) (ds: (ident * typed_func) list) =
+let rec decs (loc: int) (funcs: (ident * int) list) (ds: (ident * func) list) =
   match ds with
   | [] -> (List [], [])
   | (fv, f) :: ds ->
@@ -363,11 +386,11 @@ let rec decs (loc: int) (funcs: (ident * int) list) (ds: (ident * typed_func) li
     let (cs, fs) = decs (loc + alength c) funcs ds in
     (List [Icomment fv] ++ c ++ cs, (fv, loc) :: fs)
 
-let program (p: typed_program) =
+let program (p: program) =
   let init_len = alength (init 0 0 (* dummys *)) in
   let loc0 = prog_start + init_len in
-  let (_, fs) = decs loc0 [] p.typrog_defs in
-  let (c, _) = decs loc0 fs p.typrog_defs in
-  let main_loc = lookup_fname p.typrog_main fs in
+  let (_, fs) = decs loc0 [] p.prog_defs in
+  let (c, _) = decs loc0 fs p.prog_defs in
+  let main_loc = lookup_fname p.prog_main fs in
   let mem_start = prog_start + init_len + alength c in
   aflatten (init main_loc mem_start ++ c)
