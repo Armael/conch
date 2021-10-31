@@ -1,6 +1,4 @@
-(f)
-
 ; there is no tail-call elimination
-(:void f () (local)
-  (f)
+(:void main () (local)
+  (main)
   (ret))

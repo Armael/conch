@@ -1,6 +1,4 @@
-(main)
-
-(main () (local a)
+(:void main () (local :*u8 a)
   (a <- ! malloc 12)
   (! putchar 'H)
   (! putchar 'e)

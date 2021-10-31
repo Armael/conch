@@ -258,13 +258,9 @@ let prog_of_sexps (sexps: CCSexp.t list) =
     | _ -> die "Ill-formed function declaration"
   in
 
-  let prog_main, prog_defs =
-    match sexps with
-    | [] -> die "Empty file"
-    | `List [`Atom main] :: defs -> main, defs
-    | _ -> die "Incorrect or absent main header"
-  in
+  if sexps = [] then die "Empty file";
+  let prog_defs = List.map func_of_sexp sexps in
+  if not (List.mem_assoc "main" prog_defs) then
+    die "No 'main' entry point";
 
-  { prog_defs = List.map func_of_sexp prog_defs;
-    prog_main }
-
+  { prog_defs; prog_main = "main" }

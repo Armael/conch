@@ -1,5 +1,3 @@
-(main)
-
 (:void main () (local :u8 i)
   (i = 'a)
   (while ((i < 'z) or (i = 'z)) (

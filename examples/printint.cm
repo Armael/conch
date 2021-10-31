@@ -1,5 +1,3 @@
-(main)
-
 (:u8 char-of-num (:u8 n) (local)
   (ret (n + '0))
 )

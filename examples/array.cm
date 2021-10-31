@@ -1,5 +1,3 @@
-(main)
-
 (:void print-string (:*u8 s)
   (local :*u8 i :u8 c)
   (i = s)
