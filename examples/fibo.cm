@@ -3,8 +3,8 @@
 )
 
 (:void print-num (:u8 n) (local :u8 code)
-  (code <- char-of-num n)
-  (! putchar code)
+  (code = (char-of-num n))
+  (!putchar code)
   (ret)
 )
 
@@ -14,7 +14,7 @@
 
 (:void print-int (:u16 n) (local :u8 last-digit)
   (ifte (n < #10) ((print-num (n as :u8))) (
-    (last-digit <- mod10 n)
+    (last-digit = (mod10 n))
     (n = (n / #10))
     (print-int n)
     (print-num last-digit)
@@ -22,7 +22,7 @@
   (ret)
 )
 
-(:void newline () (local) (! putchar 10) (ret))
+(:void newline () (local) (!putchar 10) (ret))
 
 ; n: number of fibonacci terms to compute
 (:void fibo (:u8 n) (local :u16 x :u16 y :u16 tmp)

@@ -4,14 +4,14 @@
 (:*void nil () (local) (ret (#0 as :*void)))
 
 (:*void cons (:u8 x :*void xs) (local :*void cell :**void cdr)
-  (cell <- ! malloc 3)
+  (cell = (!malloc 3))
   (cdr = ((cell + 1) as :**void))
   ((cell as :*u8) := x)
   (cdr := xs)
   (ret (cell as :*void)))
 
 (:*void rev (:*void l) (local :*void prev :*void next)
-  (prev <- nil)
+  (prev = (nil))
   (while (l != #0) (
     (next = (* ((l + 1) as :**void)))
     (((l + 1) as :**void) := prev)
@@ -24,21 +24,21 @@
   (while (xs != #0) (
     (car = (* (xs as :*u8)))
     (cdr = (* ((xs + 1) as :**void)))
-    (! putchar car)
+    (!putchar car)
     (xs = cdr)
   ))
   (ret))
 
 (:void main () (local :*void l)
-  (l <- nil)
-  (l <- cons 'H l)
-  (l <- cons 'e l)
-  (l <- cons 'l l)
-  (l <- cons 'l l)
-  (l <- cons 'o l)
-  (l <- rev l)
+  (l = (nil))
+  (l = (cons 'H l))
+  (l = (cons 'e l))
+  (l = (cons 'l l))
+  (l = (cons 'l l))
+  (l = (cons 'o l))
+  (l = (rev l))
   (print-list l)
-  (! putchar 10)
+  (!putchar 10)
   (ret))
 
 ; $ ./list
