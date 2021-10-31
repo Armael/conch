@@ -11,6 +11,39 @@ let char_at s i c =
   try Char.equal (String.get s i) c
   with Invalid_argument _ -> false
 
+(* preprocessor *)
+
+let preprocess_sexps (s: CCSexp.t list) =
+  let rec expand_defines defines fuel (s: CCSexp.t) =
+    if fuel = 0 then die "Timeout when expanding defines";
+    match s with
+    | `Atom v ->
+      begin match IdentMap.find_opt v defines with
+      | Some sexp -> expand_defines defines (fuel - 1) sexp
+      | None -> `Atom v
+      end
+    | `List l ->
+      `List (List.map (expand_defines defines fuel) l)
+  in
+  let rec loop defines fuel ss =
+    if fuel = 0 then die "Timeout when expanding includes";
+    match ss with
+    | [] -> []
+    | `List [`Atom "#define"; `Atom id; body] :: ds ->
+      loop (IdentMap.add id body defines) fuel ds
+    | `List [`Atom "#include"; `Atom filename] :: ds ->
+      begin match CCSexp.parse_file_list filename with
+        | Error err -> die "Cannot parse included file %s: %s" filename err
+        | Ok sexps ->
+          loop defines (fuel - 1) (sexps @ ds)
+      end
+    | d :: ds ->
+      expand_defines defines 100 d :: loop defines fuel ds
+  in
+  loop IdentMap.empty 50 s
+
+(* *)
+
 let ty_of_string str =
   let rec aux s =
     if char_at s 0 '*' then Tptr (aux (strtl s))

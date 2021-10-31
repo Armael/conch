@@ -10,6 +10,7 @@ let () =
   match CCSexp.parse_file_list input with
   | Error err -> die "Cannot parse input file: %s" err
   | Ok sexps ->
+    let sexps = Frontend.preprocess_sexps sexps in
     let prog = Frontend.prog_of_sexps sexps in
     let cm_prog = Lang2cminor.translate_prog prog in
     Format.set_margin 30;
