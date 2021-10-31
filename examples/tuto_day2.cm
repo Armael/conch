@@ -1,0 +1,29 @@
+(#define System/r 0x08)
+(#define System/g 0x0a)
+(#define System/b 0x0c)
+
+(#define Screen/x 0x28)
+(#define Screen/y 0x2a)
+(#define Screen/pixel 0x2e)
+
+(#define DrawPixel (!out 0x42 Screen/pixel))
+
+(:void main () (local :u16 i)
+  (!out #0x2ce9 System/r)
+  (!out #0x01c0 System/g)
+  (!out #0x2ce5 System/b)
+
+  ; draw one pixel
+  (!out #8 Screen/x)
+  (!out #8 Screen/y)
+  (!out 0x41 Screen/pixel)
+
+  ; draw a horizontal line
+  (i = #8)
+  (while (i < #29) (
+    (!out i Screen/x)
+    DrawPixel
+    (i = (i + #1))
+  ))
+  (ret)
+)
