@@ -394,7 +394,6 @@ let program (p: program) =
      ^ prog start         ^ loc0
   *)
   let init_len = alength (init 0 0 (* dummys *)) in
-  Printf.eprintf "static data start: 0x%x\n" (prog_start + init_len);
   let loc0 = prog_start + init_len + List.length p.prog_static_data in
   let (_, fs) = decs loc0 [] p.prog_defs in
   let (c, _) = decs loc0 fs p.prog_defs in
