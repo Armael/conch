@@ -32,9 +32,13 @@ type func = {
   fn_ret_ty : ty;
 }
 
+type glob_init =
+  | Gconst of const
+  | Garray of const list
+
 type glob = {
   gl_ty : ty;
-  gl_init : const option;
+  gl_init : glob_init option;
 }
 
 type genv = {

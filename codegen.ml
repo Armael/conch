@@ -40,7 +40,7 @@ let ptrtype = function
 let globs_start = 0x0
 let prog_start = 0x0100
 
-let init, sp_addr, alloc_addr, init_end_offset =
+let init, sp_addr, alloc_addr, static_start =
   let setup (main_loc: int) =
     List [
       (* jump to the main function *)
@@ -53,9 +53,9 @@ let init, sp_addr, alloc_addr, init_end_offset =
       (* stack size: 512 bytes *)
       (* sp initially points to the end of the stack, i.e. mem_start+0x200.keep
          allocating stack space means decrementing sp by the size required *)
-      Idat16 (mem_start + 0x200);
+      Iraw16 (mem_start + 0x200);
       (* heap_start initially points to the part of memory after the stack *)
-      Idat16 (mem_start + 0x200);
+      Iraw16 (mem_start + 0x200);
     ]
   in
   let sp_addr = prog_start + alength (setup 0) in
@@ -81,8 +81,8 @@ let init, sp_addr, alloc_addr, init_end_offset =
     alloc
   in
   let alloc_addr = prog_start + alength (setup 0 ++ localdata 0) in
-  let init_end_offset = alength (init 0 0) in
-  init, sp_addr, alloc_addr, init_end_offset
+  let static_start = prog_start + alength (init 0 0) in
+  init, sp_addr, alloc_addr, static_start
 
 type c_stack = ident list
 
@@ -153,6 +153,10 @@ module Expr = struct
   let glob (off: int) ty =
     let glob_addr = globs_start + off in
     List [Idat glob_addr; i LDZ (szflag ty)]
+
+  let static (off: int) =
+    let static_addr = static_start + off in
+    List [Idat16 static_addr]
 
   let addr idents_ty (v: ident) (stack: c_stack) =
     let k = find_local idents_ty v stack in
@@ -228,6 +232,7 @@ module Expr = struct
     match fst e with
     | Evar v -> var idents_ty v stack
     | Eglob n -> glob n (type_of_expr e)
+    | Estatic_addr n -> static n
     | Eaddr v -> addr idents_ty v stack
     | Econst (C8 x) -> const8 x
     | Econst (C16 x) -> const16 x
@@ -308,12 +313,6 @@ module Stmt = struct
   let ef_in16 =
     List [i DEI [S]]
 
-  (* let type_of_retid_opt ty_idents id_opt =
-   *   (Option.fold
-   *      ~none:(Tbase Tvoid)
-   *      ~some:(fun v -> IdentMap.find v ty_idents)
-   *      id_opt) *)
-
   let builtin idents_ty (lid: ident option) (ef: external_function) (xs: expr list) stack =
     let args_ty = List.map snd xs in
     Expr.exprs idents_ty stack xs ++
@@ -386,11 +385,19 @@ let rec decs (loc: int) (funcs: (ident * int) list) (ds: (ident * func) list) =
     let (cs, fs) = decs (loc + alength c) funcs ds in
     (List [Icomment fv] ++ c ++ cs, (fv, loc) :: fs)
 
+let static_data (bytes: int list) =
+  List (List.map (fun n -> Iraw n) bytes)
+
 let program (p: program) =
+  (* memory layout:
+     | init | static data | the program | rest of memory ...
+     ^ prog start         ^ loc0
+  *)
   let init_len = alength (init 0 0 (* dummys *)) in
-  let loc0 = prog_start + init_len in
+  Printf.eprintf "static data start: 0x%x\n" (prog_start + init_len);
+  let loc0 = prog_start + init_len + List.length p.prog_static_data in
   let (_, fs) = decs loc0 [] p.prog_defs in
   let (c, _) = decs loc0 fs p.prog_defs in
   let main_loc = lookup_fname p.prog_main fs in
-  let mem_start = prog_start + init_len + alength c in
-  aflatten (init main_loc mem_start ++ c)
+  let mem_start = loc0 + alength c in
+  aflatten (init main_loc mem_start ++ static_data p.prog_static_data ++ c)

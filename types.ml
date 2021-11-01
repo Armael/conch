@@ -1,3 +1,5 @@
+open Common
+
 type tybase = Tvoid | Tint8 | Tint16
 type ty =
   | Tbase of tybase
@@ -8,6 +10,10 @@ let sizeof = function
   | Tbase Tvoid -> 0
   | Tbase Tint8 -> 1
   | Tbase Tint16 | Tptr _ -> 2
+
+let type_of_const = function
+  | C8 _ -> Tbase Tint8
+  | C16 _ -> Tbase Tint16
 
 (* printing *)
 

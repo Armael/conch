@@ -4,6 +4,7 @@ open Types
 type uexpr =
   | Evar of ident
   | Eglob of int (* offset in the globals table *)
+  | Estatic_addr of int (* offset in the static data table *)
   | Eaddr of ident
   | Econst of const
   | Ebinop of binary_op * expr * expr
@@ -38,6 +39,7 @@ type genv = (ty * ty list) IdentMap.t
 type program = {
   prog_genv : genv;
   prog_globs_tbl_size : int; (* in bytes *)
+  prog_static_data : int list; (* bytes *)
   prog_defs : (ident * func) list;
   prog_main : ident;
 }
@@ -45,12 +47,16 @@ type program = {
 (* conversion to sexps *)
 
 let string_of_glob n =
+  "%" ^ string_of_int n
+
+let string_of_static n =
   "@" ^ string_of_int n
 
 let rec sexp_of_expr (e: expr) =
   match fst e with
   | Evar v -> `Atom v
   | Eglob n -> `Atom (string_of_glob n)
+  | Estatic_addr n -> `Atom (string_of_static n)
   | Eaddr v -> `List [`Atom "&"; `Atom v]
   | Econst c -> `Atom (string_of_const c)
   | Ebinop (op, e1, e2) ->
@@ -67,7 +73,7 @@ let rec sexps_of_stmt (s: stmt) =
   | Sassign (v, e) ->
     [`List [`Atom v; `Atom "="; sexp_of_expr e]]
   | Sassign_glob (v, e) ->
-    [`List [`Atom (string_of_glob v); sexp_of_expr e]]
+    [`List [`Atom (string_of_glob v); `Atom "="; sexp_of_expr e]]
   | Sstore (e1, e2) ->
     [`List [sexp_of_expr e1; `Atom ":="; sexp_of_expr e2]]
   | Scall (ret, f, es) ->

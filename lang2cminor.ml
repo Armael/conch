@@ -8,14 +8,23 @@ let gen_glob_offs glob_decls : int IdentMap.t * int =
     (IdentMap.add gname n glob_offs, n + sizeof g.gl_ty)
   ) (IdentMap.empty, 0) glob_decls
 
-let mk_init_globs glob_offs glob_decls : Cminor.stmt =
-  List.fold_left (fun init (gname, glob) ->
-    match glob.gl_init with
-    | None -> init
-    | Some c ->
-      let off = IdentMap.find gname glob_offs in
-      Sseq (init, Sassign_glob (off, (Econst c, glob.gl_ty)))
-  ) Sskip glob_decls
+let mk_init_globs glob_offs glob_decls : Cminor.stmt * int list =
+  let init, _, static_data =
+    List.fold_left (fun (init, static_data_off, static_data) (gname, glob) ->
+      match glob.gl_init with
+      | None | Some (Garray []) -> (init, static_data_off, static_data)
+      | Some (Gconst c) ->
+        let off = IdentMap.find gname glob_offs in
+        Sseq (init, Sassign_glob (off, (Econst c, glob.gl_ty))),
+        static_data_off, static_data
+      | Some (Garray cs) ->
+        let off = IdentMap.find gname glob_offs in
+        let data_ty = type_of_const (List.hd cs) in
+        Sseq (init, Sassign_glob (off, (Estatic_addr static_data_off, Tptr data_ty))),
+        static_data_off + List.length cs * sizeof data_ty,
+        static_data @ List.concat_map bytes_of_const cs
+    ) (Sskip, 0, []) glob_decls
+  in (init, static_data)
 
 let gen_fresh_ident glenv lenv ty : ident * lenv (* updated lenv *) =
   let in_scope =
@@ -169,7 +178,7 @@ let translate_func glob_offs genv (f: Lang.func): Cminor.func =
 
 let translate_prog (p: Lang.program): Cminor.program =
   let glob_offs, globs_tbl_size = gen_glob_offs p.prog_globdecls in
-  let init_globs = mk_init_globs glob_offs p.prog_globdecls in
+  let init_globs, static_data = mk_init_globs glob_offs p.prog_globdecls in
   let glenv = p.prog_genv.genv_globs in
 
   let prog_defs = List.map (fun (fname, f) ->
@@ -191,5 +200,6 @@ let translate_prog (p: Lang.program): Cminor.program =
 
   { prog_genv = p.prog_genv.genv_funs;
     prog_globs_tbl_size = globs_tbl_size;
+    prog_static_data = static_data;
     prog_defs;
     prog_main = p.prog_main }

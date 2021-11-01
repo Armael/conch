@@ -168,9 +168,20 @@ let classify_decl sexp =
     `Glob (ty_of_string ty, name, None)
   | `List [`Atom ty; `Atom name; `Atom "="; `Atom c] ->
     begin match const_of_string c with
-    | Some c -> `Glob (ty_of_string ty, name, Some c)
+    | Some c -> `Glob (ty_of_string ty, name, Some (Gconst c))
     | None -> die "illegal global initializer: %s" c
     end
+  | `List [`Atom ty; `Atom name; `Atom "="; `List cs] ->
+    let cs = List.map (function
+      | `Atom c ->
+        begin match const_of_string c with
+          | Some c -> c
+          | None -> die "illegal constant in array: %s" c
+        end
+      | `List _ -> die "illegal subarray in array"
+    ) cs in
+    `Glob (ty_of_string ty, name, Some (Garray cs))
+
   | `List (
     `Atom ret_ty ::
     `Atom f ::

@@ -34,6 +34,10 @@ type external_function =
   | EF_in8
   | EF_in16
 
+let bytes_of_const = function
+  | C8 x -> [x]
+  | C16 x -> [(x lsr 8) land 0xff; x land 0xff]
+
 let string_of_op = function
   | Oadd -> "+"
   | Osub -> "-"

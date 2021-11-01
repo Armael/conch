@@ -4,9 +4,60 @@
 
 (#define Screen/x 0x28)
 (#define Screen/y 0x2a)
+(#define Screen/addr 0x2c)
 (#define Screen/pixel 0x2e)
+(#define Screen/sprite 0x2f)
 
-(#define DrawPixel (!out 0x42 Screen/pixel))
+(#define DrawPixel (!out 0x41 Screen/pixel))
+
+(:*u16 square = (#0xff81 #0x8181 #0x8181 #0x81ff))
+
+(:void addx8 () (local) (!out ((!in16 Screen/x) + #8) Screen/x) (ret))
+(:void addy8 () (local) (!out ((!in16 Screen/y) + #8) Screen/y) (ret))
+
+(:void draw-one-pixel () (local)
+  (!out #8 Screen/x)
+  (!out #8 Screen/y)
+  (!out 0x41 Screen/pixel)
+  (ret))
+
+(:void draw-a-line () (local :u16 i)
+  (i = #8)
+  (while (i < #29) (
+    (!out i Screen/x)
+    DrawPixel
+    (i = (i + #1))
+  ))
+  (ret))
+
+(:void draw-sprites () (local)
+  (!out #8 Screen/x)
+  (!out #8 Screen/y)
+  (!out square Screen/addr)
+
+  (!out 0 Screen/sprite) (addx8)
+  (!out 1 Screen/sprite) (addx8)
+  (!out 2 Screen/sprite) (addx8)
+  (!out 3 Screen/sprite) (addy8)
+
+  (!out #8 Screen/x)
+  (!out 4 Screen/sprite) (addx8)
+  (!out 5 Screen/sprite) (addx8)
+  (!out 6 Screen/sprite) (addx8)
+  (!out 7 Screen/sprite) (addy8)
+
+  (!out #8 Screen/x)
+  (!out 8 Screen/sprite) (addx8)
+  (!out 9 Screen/sprite) (addx8)
+  (!out 0xa Screen/sprite) (addx8)
+  (!out 0xb Screen/sprite) (addy8)
+
+  (!out #8 Screen/x)
+  (!out 0xc Screen/sprite) (addx8)
+  (!out 0xd Screen/sprite) (addx8)
+  (!out 0xe Screen/sprite) (addx8)
+  (!out 0xf Screen/sprite)
+  (ret))
 
 (:void main () (local :u16 i)
   (!out #0x2ce9 System/r)
@@ -14,16 +65,13 @@
   (!out #0x2ce5 System/b)
 
   ; draw one pixel
-  (!out #8 Screen/x)
-  (!out #8 Screen/y)
-  (!out 0x41 Screen/pixel)
+  ; (draw-one-pixel)
 
-  ; draw a horizontal line
-  (i = #8)
-  (while (i < #29) (
-    (!out i Screen/x)
-    DrawPixel
-    (i = (i + #1))
-  ))
+  ; draw a horizontal line 20px long
+  ; (draw-a-line)
+
+  ; drawing a square sprite
+  (draw-sprites)
+
   (ret)
 )

@@ -31,10 +31,6 @@ let evar genv lenv v : expr =
 let eaddr genv lenv v : expr =
   Eaddr v, Tptr (type_of_ident genv lenv v)
 
-let type_of_const = function
-  | C8 _ -> Tbase Tint8
-  | C16 _ -> Tbase Tint16
-
 let econst c : expr =
   Econst c, type_of_const c
 
@@ -306,12 +302,27 @@ let func genv lenv fname
   { fn_lenv = lenv; fn_params = params; fn_vars = vars;
     fn_body = body; fn_ret = ret; fn_ret_ty = ret_ty }
 
-let glob genv gname init : glob =
+let glob genv gname (init: glob_init option) : glob =
   let ty = IdentMap.find gname genv.genv_globs in
   match init with
   | None -> { gl_ty = ty; gl_init = None }
-  | Some c ->
-    if ty <> type_of_const c then
-      die "Global %s: initial value has type %a but was expected of type %a" gname
-        pp_ty (type_of_const c) pp_ty ty;
-    { gl_ty = ty; gl_init = Some c }
+  | Some init ->
+    begin match init with
+    | Gconst c ->
+      if ty <> type_of_const c then
+        die "Global %s: initial value has type %a but was expected of type %a" gname
+          pp_ty (type_of_const c) pp_ty ty;
+    | Garray [] ->
+      begin match ty with
+      | Tptr _ -> ()
+      | _ -> die "Global %s must be of pointer type" gname
+      end
+    | Garray (c::cs) ->
+      let c_ty = type_of_const c in
+      if not (List.for_all (fun c' -> type_of_const c' = c_ty) cs) then
+        die "Heterogeneous constant array for global %s" gname;
+      if ty <> Tptr c_ty then
+        die "Global %s has type %a but was expected of type %a" gname
+          pp_ty ty pp_ty (Tptr c_ty);
+    end;
+    { gl_ty = ty; gl_init = Some init }

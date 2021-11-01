@@ -44,6 +44,8 @@ type inst =
   | I of opcode * opcode_flags
   | Idat of int (* byte *)
   | Idat16 of int (* short *)
+  | Iraw of int (* byte *)
+  | Iraw16 of int (* short *)
   (* comment (has no semantics) *)
   | Icomment of string
 
@@ -54,6 +56,8 @@ let inst_size = function
   | I _ -> 1
   | Idat _ -> 2 (* LIT + 1 byte *)
   | Idat16 _ -> 3 (* LIT + 2 bytes *)
+  | Iraw _ -> 1
+  | Iraw16 _ -> 2
   | Icomment _ -> 0
 
 (* type inst =
@@ -125,33 +129,11 @@ let pp_opcode_flags ppf (f: opcode_flags) =
     (if f.short then "2" else "")
 
 let pp_inst ppf = function
-  (* | IConst (r, imm) -> Format.fprintf ppf "movq $%Ld, %a" imm pp_reg r
-   * | IMov (dst, src) -> Format.fprintf ppf "movq %a, %a" pp_reg src pp_reg dst
-   * | IAdd (dst, src) -> Format.fprintf ppf "addq %a, %a" pp_reg src pp_reg dst
-   * | ISub (dst, src) -> Format.fprintf ppf "subq %a, %a" pp_reg src pp_reg dst
-   * | ILt (r1, r2) -> Format.fprintf ppf "cmpq %a, %a ; setl %%al ; movzbl %%al, %%eax" pp_reg r2 pp_reg r1
-   * | IEqual (r1, r2) ->
-   *   Format.fprintf ppf "cmpq %a, %a ; sete %%al ; movzbl %%al, %%eax" pp_reg r1 pp_reg r2
-   * | IDiv r -> Format.fprintf ppf "divq %a" pp_reg r
-   * | IJump (CAlways, n) -> Format.fprintf ppf "jmp %a" pp_lab n
-   * | IJump (CIfTrue r, n) -> Format.fprintf ppf "cmpq $0, %a ; jne %a" pp_reg r pp_lab n
-   * | IJump (CIfFalse r, n) -> Format.fprintf ppf "cmpq $0, %a ; je %a" pp_reg r pp_lab n
-   * | ICall n -> Format.fprintf ppf "call %a" pp_lab n
-   * | IRet -> Format.fprintf ppf "ret"
-   * | IPop r -> Format.fprintf ppf "popq %a" pp_reg r
-   * | IPush r -> Format.fprintf ppf "pushq %a" pp_reg r
-   * | ILoad_RSP (r, n) -> Format.fprintf ppf "movq %d(%%rsp), %a" (8*n) pp_reg r
-   * | IStore_RSP (r, n) -> Format.fprintf ppf "movq %a, %d(%%rsp)" pp_reg r (8*n)
-   * | IGet_RSP (r, n) -> Format.fprintf ppf "movq %%rsp, %a ; addq $%d, %a" pp_reg r (8*n) pp_reg r (\* TODO: check *\)
-   * | IAdd_RSP n -> Format.fprintf ppf "addq $%d, %%rsp" (8*n)
-   * | ISub_RSP n -> Format.fprintf ppf "subq $%d, %%rsp" (8*n)
-   * | IStore (src, a, w) -> Format.fprintf ppf "movq %a, %d(%a)" pp_reg src w pp_reg a
-   * | ILoad (dst, a, w) -> Format.fprintf ppf "movq %d(%a), %a" w pp_reg a pp_reg dst
-   * | IPutChar -> Format.fprintf ppf "movq stdout(%%rip), %%rsi ; call _IO_putc@PLT"
-   * | IExit -> Format.fprintf ppf "call exit@PLT" *)
   | I (op, flags) -> Format.fprintf ppf "%a%a" pp_opcode op pp_opcode_flags flags
   | Idat x -> Format.fprintf ppf "#%.2x" (x land 0xFF)
   | Idat16 x -> Format.fprintf ppf "#%.4x" (x land 0xFFFF)
+  | Iraw x -> Format.fprintf ppf "%.2x" (x land 0xFF)
+  | Iraw16 x -> Format.fprintf ppf "%.4x" (x land 0xFFFF)
   | Icomment s -> Format.fprintf ppf "( %s )" s
 
 let pp_insts off ppf insts =
@@ -161,21 +143,6 @@ let pp_insts off ppf insts =
   ) off insts |> ignore
 
 let pp_asm off ppf asm =
-(*   Format.fprintf ppf "
- * \t.bss
- * \t.p2align 3 /* 8-byte align */
- * heapS:
- * \t.space 8*1024*1024 /* bytes of heap space */
- * \t.p2align 3 /* 8-byte align */
- * heapE:
- * \t.text
- * \t.globl main
- * main:
- * \tsubq $8, %%rsp /* 16-byte align %%rsp */
- * \tmovabs $heapS, %%r14 /* r14 := heap start */
- * \tmovabs $heapE, %%r15 /* r15 := heap end */
- * %a
- * " *)
   Format.fprintf ppf "|0100\n";
   Format.fprintf ppf "%a"
     (pp_insts off) asm
@@ -218,6 +185,8 @@ let assemble_inst = function
   | I (opcode, flags) -> [assemble_opcode_with_flags opcode flags]
   | Idat n -> [0x80 (* LIT *); n land 0xff]
   | Idat16 n -> [0x20 (* LIT2 *); (n lsr 8) land 0xff; n land 0xff]
+  | Iraw n -> [n land 0xff]
+  | Iraw16 n -> [(n lsr 8) land 0xff; n land 0xff]
   | Icomment _ -> []
 
 let assemble prog =
