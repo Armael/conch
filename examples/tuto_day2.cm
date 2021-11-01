@@ -11,6 +11,12 @@
 (#define DrawPixel (!out 0x41 Screen/pixel))
 
 (:*u16 square = (#0xff81 #0x8181 #0x8181 #0x81ff))
+(:*u16 rock = (#0x3c4e #0x9ffd #0xf962 #0x3c00))
+(:*u16 character = (#0x3c7e #0x5a7f #0x1b3c #0x5a18))
+(:*u16 new-square = (
+       #0x17f #0x7b73 #0x6343 #0x7fff
+       #0x007c #0x7c7c #0x7c7c #0x0000
+))
 
 (:void addx8 () (local) (!out ((!in16 Screen/x) + #8) Screen/x) (ret))
 (:void addy8 () (local) (!out ((!in16 Screen/y) + #8) Screen/y) (ret))
@@ -59,6 +65,39 @@
   (!out 0xf Screen/sprite)
   (ret))
 
+(:void addxc () (local) (!out ((!in16 Screen/x) + #0xc) Screen/x) (ret))
+(:void addyc () (local) (!out ((!in16 Screen/y) + #0xc) Screen/y) (ret))
+
+(:void draw-2bpp-sprites () (local)
+  (!out #8 Screen/x)
+  (!out #8 Screen/y)
+  (!out new-square Screen/addr)
+
+  (!out 0x80 Screen/sprite) (addxc)
+  (!out 0x81 Screen/sprite) (addxc)
+  (!out 0x82 Screen/sprite) (addxc)
+  (!out 0x83 Screen/sprite) (addyc)
+
+  (!out #8 Screen/x)
+  (!out 0x84 Screen/sprite) (addxc)
+  (!out 0x85 Screen/sprite) (addxc)
+  (!out 0x86 Screen/sprite) (addxc)
+  (!out 0x87 Screen/sprite) (addyc)
+
+  (!out #8 Screen/x)
+  (!out 0x88 Screen/sprite) (addxc)
+  (!out 0x89 Screen/sprite) (addxc)
+  (!out 0x8a Screen/sprite) (addxc)
+  (!out 0x8b Screen/sprite) (addyc)
+
+  (!out #8 Screen/x)
+  (!out 0x8c Screen/sprite) (addxc)
+  (!out 0x8d Screen/sprite) (addxc)
+  (!out 0x8e Screen/sprite) (addxc)
+  (!out 0x8f Screen/sprite)
+  (ret)
+)
+
 (:void main () (local :u16 i)
   (!out #0x2ce9 System/r)
   (!out #0x01c0 System/g)
@@ -70,8 +109,11 @@
   ; draw a horizontal line 20px long
   ; (draw-a-line)
 
-  ; drawing a square sprite
-  (draw-sprites)
+  ; draw square sprites
+  ; (draw-sprites)
+
+  ; draw 2pp square sprites
+  (draw-2bpp-sprites)
 
   (ret)
 )
