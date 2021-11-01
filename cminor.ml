@@ -21,7 +21,7 @@ type stmt =
   | Sbuiltin of ident option * external_function * expr list
   | Sseq of stmt * stmt
   | Sifthenelse of expr * stmt * stmt
-  | Sloop of expr * stmt
+  | Sloop of (stmt * expr) * stmt
 
 type lenv = ty IdentMap.t
 
@@ -96,8 +96,8 @@ let rec sexps_of_stmt (s: stmt) =
   | Sifthenelse (e, s1, s2) ->
     [`List [`Atom "ifte"; sexp_of_expr e;
             `List (sexps_of_stmt s1); `List (sexps_of_stmt s2)]]
-  | Sloop (e, s) ->
-    [`List [`Atom "loop"; sexp_of_expr e; `List (sexps_of_stmt s)]]
+  | Sloop ((cond_s, cond_e), s) ->
+    [`List [`Atom "loop"; `List [`List (sexps_of_stmt cond_s @ [sexp_of_expr cond_e])]; `List (sexps_of_stmt s)]]
 
 let sexps_of_typed_idents (l: (ident * ty) list) =
   List.concat_map (fun (id, ty) ->

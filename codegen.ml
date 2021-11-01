@@ -351,14 +351,16 @@ module Stmt = struct
       c2 ++
       List [Idat16 end_loc; i JMP [S]] ++
       c1
-    | Sloop (e, s) ->
+    | Sloop ((cond_s, cond_e), s) ->
       let c_loc = loc + 4 in
       let c = stmt idents_ty c_loc funcs stack s in
-      let ce_loc = loc + 4 + alength c in
-      let ce = Expr.expr idents_ty stack e in
-      List [Idat16 ce_loc; i JMP [S]] ++
+      let cond_c_loc = loc + 4 + alength c in
+      let cond_c = stmt idents_ty cond_c_loc funcs stack cond_s in
+      let cond_ce = Expr.expr idents_ty stack cond_e in
+      List [Idat16 cond_c_loc; i JMP [S]] ++
       c ++
-      ce ++
+      cond_c ++
+      cond_ce ++
       List [Idat16 c_loc; i JCN [S]]
 end
 

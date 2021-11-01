@@ -158,7 +158,7 @@ let rec translate_stmt glob_offs genv lenv (s: Lang.stmt):
   | Sloop (e, s) ->
     let se, e', lse, lenv = translate_expr glob_offs genv lenv e in
     let s', ls, lenv = translate_stmt glob_offs genv lenv s in
-    Cminor.(sseq se (Sloop (gete e', s'))),
+    Sloop ((se, gete e'), s'),
     lse @ ls, lenv
 
 let translate_func glob_offs genv (f: Lang.func): Cminor.func =
