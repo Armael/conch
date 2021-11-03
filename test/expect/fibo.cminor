@@ -1,0 +1,22 @@
+(:u8 char-of-num (:u8 n) (local) (ret (n + 48)))
+
+(:void print-num (:u8 n) (local :u8 code :u8 _x0) (_x0 <- char-of-num n)
+ (code = _x0) (putchar code) (ret))
+
+(:u8 mod10 (:u16 n) (local :u16 x) (x = ((n / #10) * #10))
+ (ret ((n - x) :u8)))
+
+(:void print-int (:u16 n) (local :u8 last-digit :u8 _x0)
+ (ifte (n < #10) ((print-num (n :u8)))
+  ((_x0 <- mod10 n) (last-digit = _x0) (n = (n / #10)) (print-int n)
+   (print-num last-digit))) (ret))
+
+(:void newline () (local) (putchar 10) (ret))
+
+(:void fibo (:u8 n) (local :u16 x :u16 y :u16 tmp) (x = #1) (y = #1)
+ (loop (((0 < n)))
+  ((tmp = x) (x = y) (y = (tmp + y)) (print-int x) (newline) (n = (n - 1))))
+ (ret))
+
+(:void main () (local) (fibo 20) (ret))
+

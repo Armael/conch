@@ -1,0 +1,8 @@
+(:void print-string (:*u8 s) (local :*u8 i :u8 c) (i = s) (c = (* i))
+ (loop ((c)) ((putchar c) (i = (i + 1)) (c = (* i)))) (ret))
+
+(:void main () (local :*u8 a :*u8 i :*void _x0) (_x0 <- malloc #12)
+ (a = (_x0 :*u8)) (i = a) (i := 72) (i = (i + 1)) (i := 101) (i = (i + 1))
+ (i := 108) (i = (i + 1)) (i := 108) (i = (i + 1)) (i := 111) (i = (i + 1))
+ (i := 0) (print-string a) (putchar 10) (ret))
+

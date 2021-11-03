@@ -1,0 +1,30 @@
+(:void addx8 () (local :u16 _x0) (_x0 <- in16 40) (out (_x0 + #8) 40) (ret))
+
+(:void addy8 () (local :u16 _x0) (_x0 <- in16 42) (out (_x0 + #8) 42) (ret))
+
+(:void draw-one-pixel () (local) (out #8 40) (out #8 42) (out 65 46) (ret))
+
+(:void draw-a-line () (local :u16 i) (i = #8)
+ (loop (((i < #29))) ((out i 40) (out 65 46) (i = (i + #1)))) (ret))
+
+(:void draw-sprites () (local) (out #8 40) (out #8 42) (out %0 44) (out 0 47)
+ (addx8) (out 1 47) (addx8) (out 2 47) (addx8) (out 3 47) (addy8) (out #8 40)
+ (out 4 47) (addx8) (out 5 47) (addx8) (out 6 47) (addx8) (out 7 47) 
+ (addy8) (out #8 40) (out 8 47) (addx8) (out 9 47) (addx8) (out 10 47)
+ (addx8) (out 11 47) (addy8) (out #8 40) (out 12 47) (addx8) (out 13 47)
+ (addx8) (out 14 47) (addx8) (out 15 47) (ret))
+
+(:void addxc () (local :u16 _x0) (_x0 <- in16 40) (out (_x0 + #12) 40) (ret))
+
+(:void addyc () (local :u16 _x0) (_x0 <- in16 42) (out (_x0 + #12) 42) (ret))
+
+(:void draw-2bpp-sprites () (local) (out #8 40) (out #8 42) (out %6 44)
+ (out 128 47) (addxc) (out 129 47) (addxc) (out 130 47) (addxc) (out 131 47)
+ (addyc) (out #8 40) (out 132 47) (addxc) (out 133 47) (addxc) (out 134 47)
+ (addxc) (out 135 47) (addyc) (out #8 40) (out 136 47) (addxc) (out 137 47)
+ (addxc) (out 138 47) (addxc) (out 139 47) (addyc) (out #8 40) (out 140 47)
+ (addxc) (out 141 47) (addxc) (out 142 47) (addxc) (out 143 47) (ret))
+
+(:void main () (local :u16 i) (%0 = @0) (%2 = @8) (%4 = @16) (%6 = @24)
+ (out #11497 8) (out #448 10) (out #11493 12) (draw-2bpp-sprites) (ret))
+

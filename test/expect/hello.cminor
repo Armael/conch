@@ -1,0 +1,4 @@
+(:void main () (local :*u8 a :*void _x0) (_x0 <- malloc 12) (a = (_x0 :*u8))
+ (putchar 72) (putchar 101) (putchar 108) (putchar 108) (putchar 111)
+ (putchar 10) (ret))
+

@@ -1,0 +1,24 @@
+(:*void nil () (local) (ret (#0 :*void)))
+
+(:*void cons (:u8 x :*void xs) (local :*void cell :**void cdr :*void _x0)
+ (_x0 <- malloc 3) (cell = _x0) (cdr = ((cell + 1) :**void))
+ ((cell :*u8) := x) (cdr := xs) (ret (cell :*void)))
+
+(:*void rev (:*void l) (local :*void prev :*void next :*void _x0)
+ (_x0 <- nil) (prev = _x0)
+ (loop (((l != #0)))
+  ((next = (* ((l + 1) :**void))) (((l + 1) :**void) := prev) (prev = l)
+   (l = next))) (ret prev))
+
+(:void print-list (:*void xs) (local :u8 car :*void cdr)
+ (loop (((xs != #0)))
+  ((car = (* (xs :*u8))) (cdr = (* ((xs + 1) :**void))) (putchar car)
+   (xs = cdr))) (ret))
+
+(:void main ()
+ (local :*void l :*void _x0 :*void _x1 :*void _x2 :*void _x3 :*void _x4
+  :*void _x5 :*void _x6) (_x0 <- nil) (l = _x0) (_x1 <- cons 72 l) (l = _x1)
+ (_x2 <- cons 101 l) (l = _x2) (_x3 <- cons 108 l) (l = _x3)
+ (_x4 <- cons 108 l) (l = _x4) (_x5 <- cons 111 l) (l = _x5) (_x6 <- rev l)
+ (l = _x6) (print-list l) (putchar 10) (ret))
+

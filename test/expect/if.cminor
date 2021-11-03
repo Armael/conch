@@ -1,0 +1,3 @@
+(:void main () (local) (ifte 0 ((putchar 97)) ((putchar 98)))
+ (ifte 1 ((putchar 97)) ((putchar 98))) (putchar 10) (ret))
+

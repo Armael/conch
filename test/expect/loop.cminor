@@ -1,0 +1,4 @@
+(:void main () (local :u8 i) (i = 97)
+ (loop ((((i < 122) or (i = 122)))) ((putchar i) (i = (i + 1)))) (putchar 10)
+ (ret))
+
