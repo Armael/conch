@@ -1,0 +1,3 @@
+(executable
+  (name conch)
+  (libraries libconch))

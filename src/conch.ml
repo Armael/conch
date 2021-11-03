@@ -1,5 +1,6 @@
-let die fmt =
-  Printf.kprintf (fun s -> Printf.eprintf "ERR: %s\n" s; exit 1) fmt
+open Libconch
+
+let die fmt = Common.die ~where:"driver" fmt
 
 let () =
   let input, output =
@@ -20,6 +21,4 @@ let () =
     let asm = Codegen.program cm_prog in
     Format.fprintf Format.std_formatter "%a\n" (Target.pp_asm Codegen.prog_start) asm;
     let bytes = Target.assemble asm in
-    let out = open_out output in
-    List.iter (output_byte out) bytes;
-    close_out out
+    CCIO.with_out output (fun out -> List.iter (output_byte out) bytes)
