@@ -46,6 +46,7 @@ let init, sp_addr, alloc_addr, static_start =
       (* jump to the main function *)
       Idat16 main_loc; i JSR [S];
       (* end of the program *)
+      Idat16 0xff0f; i DEO []; (* halt *)
       i BRK [];
     ] in
   let localdata (mem_start: int) =
