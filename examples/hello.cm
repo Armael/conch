@@ -1,5 +1,5 @@
 (:void main () (local :*u8 a)
-  (a = (!malloc 12))
+  (a = ((!malloc 12) as :*u8))
   (!putchar 'H)
   (!putchar 'e)
   (!putchar 'l)

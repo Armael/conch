@@ -1,0 +1,23 @@
+(executable
+ (name test)
+ (libraries libconch unix))
+
+;; (rule (alias runtest)
+;;   (deps
+;;    ../examples/array.cm
+;;    ../examples/fibo.cm
+;;    ../examples/hello.cm
+;;    ../examples/if.cm
+;;    ../examples/list.cm
+;;    ../examples/loop.cm
+;;    ../examples/printint.cm)
+;;   (targets
+;;    array.out array.cminor array.asm array.romsize
+;;    fibo.out fibo.cminor fibo.asm fibo.romsize
+;;    hello.out hello.cminor hello.asm hello.romsize
+;;    if.out if.cminor if.asm if.romsize
+;;    list.out list.cminor list.asm list.romsize
+;;    printint.out printint.cminor printint.asm printint.romsize
+;;   )
+;;   (action (run ./test.exe %{deps}))
+;;   (mode (promote (into expect))))
