@@ -164,7 +164,7 @@ let assemble_opcode_with_flags opcode flags =
 let assemble_inst = function
   | I (opcode, flags) -> [assemble_opcode_with_flags opcode flags]
   | Idat n -> [0x80 (* LIT *); n land 0xff]
-  | Idat16 n -> [0x20 (* LIT2 *); (n lsr 8) land 0xff; n land 0xff]
+  | Idat16 n -> [0xa0 (* LIT2 *); (n lsr 8) land 0xff; n land 0xff]
   | IdatR n -> [0xc0 (* LITr *); n land 0xff]
   | Idat16R n -> [0xe0 (* LIT2r *); (n lsr 8) land 0xff; n land 0xff]
   | Iraw n -> [n land 0xff]
