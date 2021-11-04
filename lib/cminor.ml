@@ -5,7 +5,7 @@ type uexpr =
   | Evar of ident
   | Eglob of int (* offset in the globals table *)
   | Estatic_addr of int (* offset in the static data table *)
-  | Eaddr of ident
+  | Estack_addr of int (* offset in the local stack frame *)
   | Econst of const
   | Ebinop of binary_op * expr * expr
   | Eload of expr
@@ -29,6 +29,7 @@ type func = {
   fn_lenv : lenv;
   fn_params : (ident * ty) list;
   fn_vars : (ident * ty) list;
+  fn_stackspace : int; (* in bytes *)
   fn_body : stmt;
   fn_ret : expr option;
   fn_ret_ty : ty;
@@ -57,7 +58,7 @@ let rec sexp_of_expr (e: expr) =
   | Evar v -> `Atom v
   | Eglob n -> `Atom (string_of_glob n)
   | Estatic_addr n -> `Atom (string_of_static n)
-  | Eaddr v -> `List [`Atom "&"; `Atom v]
+  | Estack_addr n -> `List [`Atom "STACKSLOTADDR"; `Atom (string_of_int n)]
   | Econst c -> `Atom (string_of_const c)
   | Ebinop (op, e1, e2) ->
     `List [sexp_of_expr e1;

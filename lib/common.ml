@@ -6,6 +6,7 @@ let die ~where fmt =
 
 type ident = string
 module IdentMap : Map.S with type key := ident = Map.Make(String)
+module IdentSet : Set.S with type elt := ident = Set.Make(String)
 
 type const =
   | C8 of int

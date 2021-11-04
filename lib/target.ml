@@ -23,6 +23,8 @@ type opcode =
   | BRK
   | ROT
   | NIP
+  | DUP
+  | STH
   | DEO
   | DEI
 
@@ -44,6 +46,8 @@ type inst =
   | I of opcode * opcode_flags
   | Idat of int (* byte *)
   | Idat16 of int (* short *)
+  | IdatR of int (* byte *)
+  | Idat16R of int (* short *)
   | Iraw of int (* byte *)
   | Iraw16 of int (* short *)
   (* comment (has no semantics) *)
@@ -54,8 +58,8 @@ let i (opcode: opcode) (flags: opflag list) =
 
 let inst_size = function
   | I _ -> 1
-  | Idat _ -> 2 (* LIT + 1 byte *)
-  | Idat16 _ -> 3 (* LIT + 2 bytes *)
+  | Idat _ | IdatR _ -> 2 (* LIT + 1 byte *)
+  | Idat16 _ | Idat16R _ -> 3 (* LIT + 2 bytes *)
   | Iraw _ -> 1
   | Iraw16 _ -> 2
   | Icomment _ -> 0
@@ -119,6 +123,8 @@ let pp_opcode ppf = function
   | BRK -> Format.fprintf ppf "BRK"
   | ROT -> Format.fprintf ppf "ROT"
   | NIP -> Format.fprintf ppf "NIP"
+  | DUP -> Format.fprintf ppf "DUP"
+  | STH -> Format.fprintf ppf "STH"
   | DEO -> Format.fprintf ppf "DEO"
   | DEI -> Format.fprintf ppf "DEI"
 
@@ -132,6 +138,8 @@ let pp_inst ppf = function
   | I (op, flags) -> Format.fprintf ppf "%a%a" pp_opcode op pp_opcode_flags flags
   | Idat x -> Format.fprintf ppf "#%.2x" (x land 0xFF)
   | Idat16 x -> Format.fprintf ppf "#%.4x" (x land 0xFFFF)
+  | IdatR x -> Format.fprintf ppf "LITr %.2x" (x land 0xFF)
+  | Idat16R x -> Format.fprintf ppf "LIT2r %.4x" (x land 0xFFFF)
   | Iraw x -> Format.fprintf ppf "%.2x" (x land 0xFF)
   | Iraw16 x -> Format.fprintf ppf "%.4x" (x land 0xFFFF)
   | Icomment s -> Format.fprintf ppf "( %s )" s
@@ -150,6 +158,7 @@ let pp_asm off ppf asm =
 let assemble_opcode = function
   | BRK -> 0x00
   | POP -> 0x02
+  | DUP -> 0x03
   | NIP -> 0x04
   | SWP -> 0x05
   | ROT -> 0x07
@@ -160,6 +169,7 @@ let assemble_opcode = function
   | JMP -> 0x0c
   | JCN -> 0x0d
   | JSR -> 0x0e
+  | STH -> 0x0f
   | LDZ -> 0x10
   | STZ -> 0x11
   | LDA -> 0x14
@@ -185,6 +195,8 @@ let assemble_inst = function
   | I (opcode, flags) -> [assemble_opcode_with_flags opcode flags]
   | Idat n -> [0x80 (* LIT *); n land 0xff]
   | Idat16 n -> [0x20 (* LIT2 *); (n lsr 8) land 0xff; n land 0xff]
+  | IdatR n -> [0xc0 (* LITr *); n land 0xff]
+  | Idat16R n -> [0xe0 (* LIT2r *); (n lsr 8) land 0xff; n land 0xff]
   | Iraw n -> [n land 0xff]
   | Iraw16 n -> [(n lsr 8) land 0xff; n land 0xff]
   | Icomment _ -> []

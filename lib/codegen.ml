@@ -85,47 +85,44 @@ let init, sp_addr, alloc_addr, static_start =
   let static_start = prog_start + alength (init 0 0) in
   init, sp_addr, alloc_addr, static_start
 
-type c_stack = ident list
+(* C in-mem stack frame layout:
+   | locals | temps |
+   ^        ^
+  SP   SP+stk_locals
+*)
 
-let find_local ty_ids (v: ident) (stack: c_stack): int =
+type c_stack = {
+  stk_locals: int;
+  stk_temps: ident list;
+}
+
+let find_temp ty_ids (v: ident) (stack: c_stack): int =
   let rec loop i = function
     | [] -> assert false
     | v' :: vs ->
       if v = v' then i
       else loop (i + sizeof (IdentMap.find v' ty_ids)) vs
-  in loop 0 stack
+  in loop 0 stack.stk_temps
 
 let stack_size ty_ids (stack: c_stack): int =
+  stack.stk_locals +
   List.fold_left (fun sz v ->
     sz + sizeof (IdentMap.find v ty_ids)
-  ) 0 stack
+  ) 0 stack.stk_temps
 
 (* k: offset in bytes *)
-let get_stackelt_addr (k: int) =
-  List [
-    Idat16 sp_addr;
-    i LDA [S];  (* read sp *)
-    Idat16 k; i ADD [S]; (* sp+k *)
-  ]
+let get_stk_offset (k: int) =
+  List [Idat16 sp_addr; i LDA [S]] ++ (* read sp *)
+  (if k = 0 then List [] else List [Idat16 k; i ADD [S]]) (* sp+k *)
 
-(* push the value at the top of the vm stack of type [ty]
-   to the top of the C stack
-*)
-let push_to_c_stack ty =
-  assert (sizeof ty <> 0);
-  List [
-    Idat16 sp_addr; i LDA [S;K]; Idat16 (sizeof ty); i SUB [S]; (* sp-sizeof(ty) *)
-    i SWP [S]; i STA [S;K]; i POP [S]; (* write the new sp (sp-sizeof(ty)) *)
-    i STA (szflag ty); (* write the value at the top of the stack *)
-  ]
+let get_temp_addr ty_ids (v: ident) (stack: c_stack) =
+  let k (* offset in bytes *) =
+    stack.stk_locals +
+    find_temp ty_ids v stack in
+  get_stk_offset k
 
-(* decrease SP by k bytes *)
-let sub_sp (k: int) =
-  if k = 0 then List [] else
-    List [
-      Idat16 sp_addr; i LDA [S;K]; Idat16 k; i SUB [S]; (* sp-k *)
-      i SWP [S]; i STA [S]
-    ]
+let get_local_addr (off: int) =
+  get_stk_offset off
 
 (* increment SP by k bytes *)
 let add_sp (k: int) =
@@ -139,7 +136,8 @@ module Expr = struct
   (* invariant:
      top of the vm stack = result of evaluating last expression
      vm stack = temporaries
-     c stack = variables and locals
+     c stack (in memory) =
+       explictly stack allocated vars + temporaries (which we all spill atm)
 
      an expression (fragment) operates on the vm stack:
      - takes its arguments from the vm stack
@@ -147,9 +145,8 @@ module Expr = struct
   *)
 
   let var idents_ty (v: ident) (stack: c_stack) =
-    let k = find_local idents_ty v stack in
-    get_stackelt_addr k ++
-    List [i LDA (szflag (IdentMap.find v idents_ty))] (* read sp+k *)
+    get_temp_addr idents_ty v stack ++
+    List [i LDA (szflag (IdentMap.find v idents_ty))]
 
   let glob (off: int) ty =
     let glob_addr = globs_start + off in
@@ -159,9 +156,8 @@ module Expr = struct
     let static_addr = static_start + off in
     List [Idat16 static_addr]
 
-  let addr idents_ty (v: ident) (stack: c_stack) =
-    let k = find_local idents_ty v stack in
-    get_stackelt_addr k
+  let stack_local_addr (off: int) =
+    get_local_addr off
 
   let const16 (c: int) =
     assert (c land 0xFFFF = c);
@@ -234,7 +230,7 @@ module Expr = struct
     | Evar v -> var idents_ty v stack
     | Eglob n -> glob n (type_of_expr e)
     | Estatic_addr n -> static n
-    | Eaddr v -> addr idents_ty v stack
+    | Estack_addr n -> stack_local_addr n
     | Econst (C8 x) -> const8 x
     | Econst (C16 x) -> const16 x
     | Ebinop (op, e1, e2) ->
@@ -256,9 +252,6 @@ module Expr = struct
       exprs_aux idents_ty stack es
 end
 
-let call_pops (tys: ty list) =
-  appendl (List.map (fun ty -> push_to_c_stack ty) tys)
-
 let rec lookup_fname (f: ident) (funcs: (ident * int) list): int =
   match funcs with
   | [] -> 0 (* dummy *)
@@ -268,9 +261,8 @@ module Stmt = struct
   let skip = List []
 
   let assign idents_ty (v: ident) (e: expr) (stack: c_stack) =
-    let k = find_local idents_ty v stack in
     Expr.expr idents_ty stack e ++
-    get_stackelt_addr k ++
+    get_temp_addr idents_ty v stack ++
     List [i STA (szflag (IdentMap.find v idents_ty))]
 
   let assign_glob idents_ty (off: int) (e: expr) (stack: c_stack) =
@@ -284,13 +276,13 @@ module Stmt = struct
 
   let call idents_ty (lid: ident option) (target: int) (xs: expr list) stack =
     Expr.exprs idents_ty stack xs ++
-    call_pops (List.rev_map type_of_expr xs) ++
+    (* call_pops (List.rev_map type_of_expr xs) ++ *)
     List [Idat16 target; i JSR [S]] ++
     (match lid with
      | None -> List []
      | Some v ->
-       let k = find_local idents_ty v stack in
-       get_stackelt_addr k ++ List [i STA (szflag (IdentMap.find v idents_ty))])
+       get_temp_addr idents_ty v stack ++
+       List [i STA (szflag (IdentMap.find v idents_ty))])
 
   let ef_putchar =
     List [Idat 0x18; i DEO []]
@@ -327,8 +319,8 @@ module Stmt = struct
     (match lid with
      | None -> List []
      | Some v ->
-       let k = find_local idents_ty v stack in
-       get_stackelt_addr k ++ List [i STA (szflag (IdentMap.find v idents_ty))])
+       get_temp_addr idents_ty v stack ++
+       List [i STA (szflag (IdentMap.find v idents_ty))])
 
   let rec stmt idents_ty (loc: int) (funcs: (ident * int) list) stack = function
     | Sskip -> skip
@@ -367,12 +359,30 @@ end
 
 module Func = struct
   let func (loc: int) (funcs: (ident * int) list) (f: func) =
-    let vars = List.map fst f.fn_vars in
-    let stack = vars @ (List.map fst f.fn_params) in
-    (* reserve stack space for the local variables *)
-    let subsp = sub_sp (stack_size f.fn_lenv vars) in
-    subsp ++
-    Stmt.stmt f.fn_lenv (loc + alength subsp) funcs stack f.fn_body ++
+    let stack = {
+      stk_locals = f.fn_stackspace;
+      stk_temps = List.map fst (f.fn_vars @ f.fn_params);
+    } in
+    let prelude =
+      if stack.stk_locals = 0 && stack.stk_temps = [] then List [] else (
+        (* write params to stack *)
+        List [Idat16R sp_addr; i LDA [S;K;R]; (* rstk: &sp; sp *)] ++
+        List.fold_right (fun (_, ty) instrs ->
+          instrs ++
+          List [Idat16R (sizeof ty); i SUB [S;R]] ++ (* rstk: &sp; sp-(sizeof ty) *)
+          List [i DUP [S;R]; i STH (szflag ty)] ++
+          List (if sizeof ty = 2 then [i SWP [S;R]] else [i ROT [R]; i ROT [R]]) ++
+          (* rstk: &sp; sp-(sizeof ty); p; sp-(sizeof ty) *)
+          List [i STA (R::szflag ty)] (* rstk: &sp; sp-(sizeof ty) *)
+        ) f.fn_params (List []) ++
+        (* reserve stack space for the local params + variables *)
+        List [Idat16R (stack_size f.fn_lenv { stack with stk_temps = List.map fst f.fn_vars });
+              i SUB [S;R]; (* rstk: &sp; sp-stack_size *)
+              i SWP [S;R]; i STA [S;R]]
+      )
+    in
+    prelude ++
+    Stmt.stmt f.fn_lenv (loc + alength prelude) funcs stack f.fn_body ++
     (match f.fn_ret with
      | None -> List []
      | Some rete -> Expr.expr f.fn_lenv stack rete) ++
