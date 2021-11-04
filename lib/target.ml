@@ -64,36 +64,6 @@ let inst_size = function
   | Iraw16 _ -> 2
   | Icomment _ -> 0
 
-(* type inst =
- *   (\* arithmetic *\)
- *   | IConst of reg * int64
- *   | IMov of reg * reg
- *   | IAdd of reg * reg
- *   | ISub of reg * reg
- *   | IDiv of reg
- *   | ILt of reg * reg
- *   | IEqual of reg * reg
- *   (\* jumps *\)
- *   | IJump of cond * int
- *   | ICall of int
- *   (\* stack *\)
- *   | IRet
- *   | IPop of reg
- *   | IPush of reg
- *   | IAdd_RSP of int
- *   | ISub_RSP of int
- *   | ILoad_RSP of reg * int
- *   | IStore_RSP of reg * int
- *   | IGet_RSP of reg * int
- *   (\* memory *\)
- *   | ILoad of reg * reg * int
- *   | IStore of reg * reg * int
- *   (\* I/O *\)
- *   | IPutChar
- *   | IExit
- *   (\* comment (has no semantics) *\)
- *   | IComment of string *)
-
 type asm = inst list
 
 let pp_lab ppf n = Format.fprintf ppf "L%d" n
