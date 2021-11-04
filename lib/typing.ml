@@ -7,11 +7,6 @@ let die fmt = Common.die ~where:"typing" fmt
 let type_of_expr (e: expr): ty =
   snd e
 
-(* let find_id id map =
- *   match IdentMap.find_opt id map with
- *   | None -> die "Unbound identifier %s" id
- *   | Some res -> res *)
-
 let type_of_ident genv lenv v =
   match IdentMap.find_opt v lenv with
   | Some ty -> ty
@@ -119,18 +114,6 @@ let type_of_builtin args_ty = function
 
 (* used both for function calls and calls to builtins *)
 let typecheck_call fname(*for printing*) args_ty (es: expr list) =
-  (* begin match ret_ty, ret_id_opt with
-   * | Tbase Tvoid, Some _ ->
-   *   die "call to %s: cannot bind result of function returning void" fname
-   * | Tbase Tvoid, None -> ()
-   * | _, None ->
-   *   die "call to %s: ignoring a non-void result" fname
-   * | _, Some rid ->
-   *   let rid_ty = find_id rid ty_idents in
-   *   if ret_ty <> rid_ty then
-   *     die "call to %s: wrong return type: function returns a %a but expected %a"
-   *       fname pp_ty ret_ty pp_ty rid_ty
-   * end; *)
   if List.length es <> List.length args_ty then
     die "call to %s: wrong number of arguments (expected %d)" fname
       (List.length args_ty);
@@ -192,50 +175,6 @@ let sloop econd sbody =
     die "wrong type for a loop condition: got %a, expected %a"
       pp_ty tycond pp_ty (Tbase Tint8);
   Sloop (econd, sbody)
-
-(*
-let rec type_stmt ty_funs ty_idents (stmt: stmt): stmt =
-  match stmt with
-
-  (* | Scall (retid, fname, es) ->
-   *   let fun_ret_ty, fun_args_ty = find_id fname ty_funs in
-   *   let tes = List.map (type_expr ty_idents) es in
-   *   typecheck_call ty_idents fname fun_ret_ty fun_args_ty retid tes;
-   *   Scall (retid, fname, tes)
-   *
-   * | Sbuiltin (retid, ef, es) ->
-   *   let tes = List.map (type_expr ty_idents) es in
-   *   let ret_ty, args_ty =
-   *     type_of_builtin
-   *       (type_of_retid_opt ty_idents retid)
-   *       (List.map snd tes)
-   *       ef
-   *   in
-   *   typecheck_call ty_idents (string_of_builtin ef) ret_ty args_ty retid tes;
-   *   Sbuiltin (retid, ef, tes) *)
-
-  | Sseq (s1, s2) ->
-    let ts1 = type_stmt ty_funs ty_idents s1 in
-    let ts2 = type_stmt ty_funs ty_idents s2 in
-    Sseq (ts1, ts2)
-
-  | Sifthenelse (econd, s1, s2) ->
-    let _, tycond as tecond = type_expr ty_idents econd in
-    if tycond <> Tbase Tint8 then
-      die "wrong type for a if condition: got %a, expected %a"
-        pp_ty tycond pp_ty (Tbase Tint8);
-    let ts1 = type_stmt ty_funs ty_idents s1 in
-    let ts2 = type_stmt ty_funs ty_idents s2 in
-    Sifthenelse (tecond, ts1, ts2)
-
-  | Sloop (econd, sbody) ->
-    let _, tycond as tecond = type_expr ty_idents econd in
-    if tycond <> Tbase Tint8 then
-      die "wrong type for a loop condition: got %a, expected %a"
-        pp_ty tycond pp_ty (Tbase Tint8);
-    let tsbody = type_stmt ty_funs ty_idents sbody in
-    Sloop (tecond, tsbody)
-*)
 
 let build_genv (proto_decls :
                   [ `Glob of ty * ident
